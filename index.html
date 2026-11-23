@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Work Tracker ✿</title>
+<title>Genesis WHT ✿</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -42,7 +44,7 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);c
 .sv{font-size:1.5rem;font-weight:800;color:var(--r4);letter-spacing:-.03em;line-height:1;}
 .sv.a{color:var(--am);}.sv.g{color:var(--gn);}.sv.m{color:var(--mt);}
 .sl{font-size:.7rem;color:var(--mt);font-weight:600;margin-top:4px;}
-.sl.tap-hint::after{content:' ›';color:var(--r4);}
+.sl.tap-hint::after{content:' \u203A';color:var(--r4);}
 .takehome{background:var(--gnb);border-radius:12px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
 .th-l{font-size:.78rem;color:var(--gn);font-weight:600;}
 .th-v{font-size:1rem;font-weight:800;color:var(--gn);}
@@ -96,46 +98,50 @@ input:focus,select:focus{border-color:var(--r4);background:#fff;}
 .piltabs{display:flex;gap:4px;}
 .piltab{flex:1;padding:7px 10px;border-radius:9px;border:1.5px solid var(--bd);background:var(--sf);font-size:.76rem;font-weight:700;font-family:inherit;color:var(--mt);cursor:pointer;transition:all .12s;}
 .piltab.on{background:var(--r4);color:#fff;border-color:var(--r4);}
-.pnav{display:flex;align-items:center;gap:0;width:100%;margin-bottom:10px;}
-.pnbtn{background:var(--r1);border:1.5px solid var(--bd);color:var(--r6);font-weight:800;font-size:1rem;border-radius:9px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-family:inherit;}
+.pnav{display:flex;align-items:center;width:100%;margin-bottom:10px;}
+.pnbtn{background:var(--r1);border:1.5px solid var(--bd);color:var(--r6);font-weight:800;font-size:1.1rem;border-radius:9px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-family:inherit;line-height:1;}
 .pnbtn:active{background:var(--r2);}
 .pnlbl{flex:1;text-align:center;font-size:.8rem;font-weight:700;color:var(--tx);padding:0 6px;}
 .empty{text-align:center;padding:20px 16px;color:var(--mt);}
 .empty p{font-size:.8rem;font-weight:500;}
 .snote{font-size:.72rem;color:var(--mt);font-weight:500;padding:4px 0 2px;line-height:1.5;}
-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:calc(var(--nh) + var(--sb));background:#fff;border-top:1px solid var(--bd);padding-bottom:var(--sb);box-shadow:0 -4px 20px rgba(232,105,138,.1);z-index:100;}
+/* NAV — fix disappearing buttons */
+nav{display:none;position:fixed;bottom:0;left:0;right:0;height:calc(var(--nh) + var(--sb));background:#fff;border-top:1px solid var(--bd);padding-bottom:var(--sb);box-shadow:0 -4px 20px rgba(232,105,138,.1);z-index:100;overflow:hidden;}
 nav.show{display:flex;}
-.nb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;background:none;cursor:pointer;color:var(--mt);font-family:inherit;padding:8px 0;transition:color .15s;}
+.nb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;background:none;cursor:pointer;color:var(--mt);font-family:inherit;padding:6px 2px;transition:color .15s;min-width:0;overflow:hidden;}
 .nb.on{color:var(--r4);}
-.nb svg{width:22px;height:22px;}
-.nlbl{font-size:.61rem;font-weight:700;letter-spacing:.02em;}
+.nb svg{width:22px;height:22px;flex-shrink:0;}
+.nlbl{font-size:.61rem;font-weight:700;letter-spacing:.02em;white-space:nowrap;}
+/* SHEETS — scrollable so keyboard can't hide buttons */
 .overlay{position:fixed;inset:0;background:rgba(45,27,36,.45);display:none;align-items:flex-end;justify-content:center;z-index:200;backdrop-filter:blur(2px);}
 .overlay.on{display:flex;}
-.sheet{background:#fff;border-radius:20px 20px 0 0;padding:20px 20px calc(20px + var(--sb));width:100%;max-width:500px;animation:sup .22s cubic-bezier(.4,0,.2,1);}
+.sheet{background:#fff;border-radius:20px 20px 0 0;padding:20px 20px calc(20px + var(--sb));width:100%;max-width:500px;animation:sup .22s cubic-bezier(.4,0,.2,1);overflow-y:auto;max-height:calc(90dvh - var(--st));overscroll-behavior:contain;}
 @keyframes sup{from{transform:translateY(60px);opacity:.5}to{transform:none;opacity:1}}
-.sheet-scroll{max-height:88dvh;display:flex;flex-direction:column;}
+.sheet-scroll{display:flex;flex-direction:column;}
 .stitle{font-size:1.05rem;font-weight:800;color:var(--r6);margin-bottom:16px;flex-shrink:0;}
 .spull{width:36px;height:4px;background:var(--bd);border-radius:2px;margin:-8px auto 16px;flex-shrink:0;}
-.dscroll{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;}
+.dscroll{flex:1;}
 .drow{padding:10px 0;border-bottom:1px solid var(--bd);}
 .drow:last-child{border-bottom:none;}
-.dtotal{padding-top:14px;border-top:2px solid var(--r2);margin-top:4px;flex-shrink:0;}
+.dtotal{padding-top:14px;border-top:2px solid var(--r2);margin-top:4px;}
 .toast{position:fixed;top:calc(var(--st) + 14px);left:50%;transform:translateX(-50%) translateY(-70px);background:var(--tx);color:#fff;padding:9px 18px;border-radius:20px;font-size:.8rem;font-weight:600;z-index:400;transition:transform .25s cubic-bezier(.4,0,.2,1);white-space:nowrap;pointer-events:none;}
 .toast.on{transform:translateX(-50%) translateY(0);}
 hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
 .row{display:flex;justify-content:space-between;align-items:center;}
-/* Break toggle */
+/* BREAK TOGGLE — consistent, proportional */
 .trow{display:flex;justify-content:space-between;align-items:center;padding:4px 0 12px;}
-.trow label{font-size:.84rem;font-weight:600;color:var(--tx);cursor:pointer;}
-.tcb{-webkit-appearance:none;appearance:none;width:44px;height:24px;background:var(--r2);border-radius:12px;position:relative;cursor:pointer;flex-shrink:0;transition:background .2s;}
+.trow label{font-size:.84rem;font-weight:600;color:var(--tx);cursor:pointer;flex:1;padding-right:12px;}
+.tcb{-webkit-appearance:none;appearance:none;width:44px;height:24px;background:var(--r2);border-radius:12px;position:relative;cursor:pointer;flex-shrink:0;transition:background .2s;display:block;}
 .tcb:checked{background:var(--r4);}
-.tcb::after{content:'';position:absolute;width:20px;height:20px;background:white;border-radius:50%;top:2px;left:2px;box-shadow:0 1px 3px rgba(0,0,0,.12);transition:left .2s;}
+.tcb::after{content:'';position:absolute;width:20px;height:20px;background:white;border-radius:50%;top:2px;left:2px;box-shadow:0 1px 3px rgba(0,0,0,.15);transition:left .2s;}
 .tcb:checked::after{left:22px;}
-/* Week override toggle */
-.wov{-webkit-appearance:none;appearance:none;width:30px;height:17px;background:var(--bd);border-radius:9px;position:relative;cursor:pointer;flex-shrink:0;transition:background .2s;}
+/* WEEK SHORT TOGGLE — same proportions, slightly smaller */
+.wov-wrap{display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none;}
+.wov{-webkit-appearance:none;appearance:none;width:38px;height:22px;background:var(--bd);border-radius:11px;position:relative;cursor:pointer;flex-shrink:0;transition:background .2s;display:block;}
 .wov:checked{background:var(--am);}
-.wov::after{content:'';position:absolute;width:13px;height:13px;background:white;border-radius:50%;top:2px;left:2px;transition:left .2s;}
-.wov:checked::after{left:15px;}
+.wov::after{content:'';position:absolute;width:18px;height:18px;background:white;border-radius:50%;top:2px;left:2px;box-shadow:0 1px 3px rgba(0,0,0,.15);transition:left .2s;}
+.wov:checked::after{left:18px;}
+.wov-lbl{font-size:.64rem;color:var(--mt);font-weight:700;white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -152,7 +158,7 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
     <div class="fg"><label>Password</label><input type="password" id="a-pwd" placeholder="••••••••" autocomplete="current-password"></div>
     <button class="btn bp" id="a-btn" onclick="doAuth()">Log in</button>
     <button class="btn bs" style="margin-top:8px;" onclick="toggleAuth()"><span id="a-tgl">New here? Create account</span></button>
-        <button class="btn bs" style="margin-top:8px;" onclick="signInWithGoogle()">
+    <button class="btn bs" style="margin-top:8px;" onclick="signInWithGoogle()">
       <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="flex-shrink:0;">
         <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z"/>
         <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z"/>
@@ -161,12 +167,10 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
       </svg>
       <span>Continue with Google</span>
     </button>
-
   </div>
 </div>
 
 <div id="app">
-  <!-- TODAY -->
   <div class="ptop" id="top-today"><h1 id="hd"></h1><p class="sub" id="hw"></p></div>
   <div class="page on" id="page-today">
     <div class="sgrid">
@@ -195,19 +199,17 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
         <div class="fg"><label>End time</label><input type="time" id="te" onchange="checkBreakSuggest()"></div>
       </div>
       <div class="fg"><label>Note (optional)</label><input type="text" id="tn" placeholder="e.g. extra shift"></div>
-      <div class="trow"><label for="t-break">30-min break deducted?</label><input type="checkbox" class="tcb" id="t-break"></div>
+      <div class="trow"><label for="t-break" id="t-break-lbl">30-min break deducted?</label><input type="checkbox" class="tcb" id="t-break"></div>
       <button class="btn bp" onclick="logShift()">Log shift</button>
     </div>
   </div>
 
-  <!-- HISTORY -->
   <div class="ptop" id="top-history" style="display:none;"><h1>History</h1><p class="sub">Every shift you've worked</p></div>
   <div class="page" id="page-history">
     <button class="btn bs" style="margin-bottom:10px;" onclick="openPast()">+ Add past shift</button>
     <div class="card" id="hist-list"></div>
   </div>
 
-  <!-- MONEY -->
   <div class="ptop" id="top-money" style="display:none;"><h1>Money</h1><p class="sub">What you've earned and what you owe</p></div>
   <div class="page" id="page-money">
     <div class="obanner">
@@ -242,7 +244,6 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
     </div>
   </div>
 
-  <!-- PLAN -->
   <div class="ptop" id="top-plan" style="display:none;"><h1>Plan</h1><p class="sub">Goals & financial overview</p></div>
   <div class="page" id="page-plan">
     <div class="row" style="margin-bottom:10px;">
@@ -268,7 +269,6 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
     </div>
   </div>
 
-  <!-- SETTINGS -->
   <div class="ptop" id="top-settings" style="display:none;"><h1>Settings</h1><p class="sub">Set once, change whenever</p></div>
   <div class="page" id="page-settings">
     <div class="card">
@@ -297,14 +297,13 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
     <div class="card">
       <div class="ctitle">Advanced</div>
       <div class="fg"><label>Mandatory break duration (minutes)</label><input type="number" id="s-brk" placeholder="30" min="0" max="120"></div>
-      <p class="snote">Applied when "break deducted" is toggled on a shift.</p>
+      <p class="snote">Applied when "break deducted" is toggled. Auto-suggested when shift is 6h+. Changing this does not affect already-logged shifts.</p>
     </div>
-        <button class="btn bp" onclick="saveCfg()">Save settings</button>
+    <button class="btn bp" onclick="saveCfg()">Save settings</button>
     <button class="btn bs" style="margin-top:10px;" onclick="openConfirm('Log out?',logout)">Log out</button>
   </div>
 </div>
 
-<!-- NAV -->
 <nav id="nav">
   <button class="nb on" id="nav-today" onclick="go('today')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -334,9 +333,9 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
   <div class="fg"><label>Date</label><input type="date" id="ss-d"></div>
   <div class="r2"><div class="fg"><label>Start</label><input type="time" id="ss-s" onchange="checkBreakSuggestEdit()"></div><div class="fg"><label>End</label><input type="time" id="ss-e" onchange="checkBreakSuggestEdit()"></div></div>
   <div class="fg"><label>Note (optional)</label><input type="text" id="ss-n"></div>
-  <div class="trow"><label for="ss-break">30-min break deducted?</label><input type="checkbox" class="tcb" id="ss-break"></div>
+  <div class="trow"><label for="ss-break" id="ss-break-lbl">30-min break deducted?</label><input type="checkbox" class="tcb" id="ss-break"></div>
   <div class="brow"><button class="btn bs" onclick="cl('sh-shift')">Cancel</button><button class="btn bp" id="ss-save" onclick="saveShift()">Save</button></div>
-  <button class="btn bs" id="ss-del" style="margin-top:8px;display:none;color:var(--rd);background:var(--rdb);" onclick="delEditShift()">Delete shift</button>
+  <button class="btn bs" id="ss-del" style="margin-top:8px;color:var(--rd);background:var(--rdb);display:none;" onclick="delEditShift()">Delete shift</button>
 </div></div>
 
 <div class="overlay" id="sh-hrs-detail" onclick="oc(this)"><div class="sheet sheet-scroll">
@@ -413,31 +412,40 @@ const SB_URL = 'https://oylcnltcxrdhkxdpuqxy.supabase.co';
 const SB_KEY = 'sb_publishable_AuPjl9CFxQSxdTqtWW71_g_jY__JCSi';
 // ═══════════════════════════════════════
 
-let sb, user, isSignup = false;
-let cfg = {baseRate:18,otRate:27,otThreshold:40,weekStartDay:4,startingOwed:0,taxRate:0,breakMinutes:30};
-const DEF_CATS = [{id:'rent',name:'Rent',emoji:'\uD83C\uDFE0'},{id:'spending',name:'Spending money',emoji:'\uD83D\uDCB3'},{id:'other',name:'Other',emoji:'\uD83D\uDCE6'}];
-let cats=[...DEF_CATS], shts=[], exps=[], recs=[], pays=[], gols=[], weekOverrides=[];
-let cur='today', planPeriod='week', planOffset=0, moneyPeriod='week', moneyOffset=0;
-let _eid=null, _gid=null;
+let sb, user, isSignup=false;
+let cfg={baseRate:18,otRate:27,otThreshold:40,weekStartDay:4,startingOwed:0,taxRate:0,breakMinutes:30};
+const DEF_CATS=[{id:'rent',name:'Rent',emoji:'\uD83C\uDFE0'},{id:'spending',name:'Spending money',emoji:'\uD83D\uDCB3'},{id:'other',name:'Other',emoji:'\uD83D\uDCE6'}];
+let cats=[...DEF_CATS],shts=[],exps=[],recs=[],pays=[],gols=[],weekOverrides=[];
+let cur='today',planPeriod='week',planOffset=0,moneyPeriod='week',moneyOffset=0;
+let _eid=null,_gid=null;
 
 // ═══ BOOT ═══
 document.addEventListener('DOMContentLoaded',()=>{
-  if(SB_URL.includes('YOUR_')){document.getElementById('loading').innerHTML='<div style="text-align:center;padding:40px 24px;max-width:300px;"><div style="font-size:2rem;margin-bottom:12px;">&#9881;&#65039;</div><div style="font-weight:800;color:#C44E70;font-size:1.05rem;margin-bottom:10px;">Setup needed</div><div style="font-size:.82rem;color:#9B7080;line-height:1.6;">Open <code style="background:#FFF0F5;padding:2px 5px;border-radius:4px;">worktracker.html</code> and replace<br><code style="background:#FFF0F5;padding:2px 5px;border-radius:4px;">YOUR_SUPABASE_URL</code><br>and<br><code style="background:#FFF0F5;padding:2px 5px;border-radius:4px;">YOUR_SUPABASE_ANON_KEY</code><br>with your project credentials from supabase.com</div></div>';return;}
+  if(SB_URL.includes('YOUR_')){
+    document.getElementById('loading').innerHTML='<div style="text-align:center;padding:40px 24px;max-width:300px;"><div style="font-size:2rem;margin-bottom:12px;">&#9881;&#65039;</div><div style="font-weight:800;color:#C44E70;margin-bottom:10px;">Setup needed</div><div style="font-size:.82rem;color:#9B7080;line-height:1.6;">Replace <code style="background:#FFF0F5;padding:1px 5px;border-radius:4px;">YOUR_SUPABASE_URL</code> and <code style="background:#FFF0F5;padding:1px 5px;border-radius:4px;">YOUR_SUPABASE_ANON_KEY</code> in worktracker.html with your Supabase project credentials.</div></div>';
+    return;
+  }
   sb=supabase.createClient(SB_URL,SB_KEY);
-  sb.auth.onAuthStateChange(async(event,session)=>{
+  sb.auth.onAuthStateChange(async(ev,session)=>{
     if(session?.user){user=session.user;await loadAll();showApp();}
     else{user=null;showAuth();}
   });
 });
 
+// Keyboard: scroll focused input into view when keyboard opens
+document.addEventListener('focusin',e=>{
+  if(!e.target.matches('input,select')&&!e.target.closest('.overlay.on'))return;
+  setTimeout(()=>e.target.scrollIntoView({behavior:'smooth',block:'center'}),350);
+});
+
 function showAuth(){document.getElementById('loading').style.display='none';document.getElementById('auth').style.display='flex';document.getElementById('app').style.display='none';document.getElementById('nav').classList.remove('show');}
 function showApp(){document.getElementById('loading').style.display='none';document.getElementById('auth').style.display='none';document.getElementById('app').style.display='block';document.getElementById('nav').classList.add('show');go('today');}
+
 async function doAuth(){
   const email=document.getElementById('a-email').value.trim(),pwd=document.getElementById('a-pwd').value,btn=document.getElementById('a-btn');
   if(!email||!pwd){showAErr('Please fill in both fields');return;}
   btn.textContent='...';btn.disabled=true;document.getElementById('a-err').style.display='none';
-  const fn=isSignup?sb.auth.signUp({email,password:pwd}):sb.auth.signInWithPassword({email,password:pwd});
-  const{error,data}=await fn;
+  const{error,data}=await(isSignup?sb.auth.signUp({email,password:pwd}):sb.auth.signInWithPassword({email,password:pwd}));
   if(error){showAErr(error.message);btn.textContent=isSignup?'Create account':'Log in';btn.disabled=false;return;}
   if(isSignup&&!data.session){showAErr('Check your email to confirm, then log in.');btn.textContent='Create account';btn.disabled=false;}
 }
@@ -468,18 +476,29 @@ async function loadAll(){
       sb.from('user_settings').select('*').eq('user_id',uid).maybeSingle(),
       sb.from('week_overrides').select('*').eq('user_id',uid)
     ]);
-    shts=(a.data||[]).map(r=>({id:r.id,date:r.date,start:r.start_time,end:r.end_time,hours:+r.hours,note:r.note||'',baseRate:+r.base_rate,otRate:+r.ot_rate,otThreshold:+r.ot_threshold,breakTaken:r.break_taken||false}));
+    // paid_hours stored on shift; fallback for legacy data: break_taken assumes 30min
+    shts=(a.data||[]).map(r=>({
+      id:r.id,date:r.date,start:r.start_time,end:r.end_time,hours:+r.hours,note:r.note||'',
+      baseRate:+r.base_rate,otRate:+r.ot_rate,otThreshold:+r.ot_threshold,
+      breakTaken:r.break_taken||false,
+      paidHours:r.paid_hours!=null?+r.paid_hours:(r.break_taken?Math.max(0,+r.hours-0.5):+r.hours)
+    }));
     exps=(b.data||[]).map(r=>({id:r.id,name:r.name,amount:+r.amount,catId:r.cat_id,date:r.date}));
     recs=(c.data||[]).map(r=>({id:r.id,name:r.name,amount:+r.amount,day:r.day_of_month}));
     pays=(d.data||[]).map(r=>({id:r.id,amount:+r.amount,date:r.date,note:r.note||''}));
     gols=(e.data||[]).map(r=>({id:r.id,name:r.name,target:+r.target,saved:+r.saved}));
     weekOverrides=(g.data||[]).map(r=>({id:r.id,weekStart:r.week_start,daysCut:r.days_cut}));
-    if(f.data){const s=f.data;cfg={baseRate:+s.base_rate,otRate:+s.ot_rate,otThreshold:+s.ot_threshold,weekStartDay:s.week_start_day,startingOwed:+s.starting_owed||0,taxRate:+s.tax_rate||0,breakMinutes:+(s.break_minutes||30)};cats=s.categories||DEF_CATS;}
-    else{await sb.from('user_settings').insert({user_id:uid,base_rate:18,ot_rate:27,ot_threshold:40,week_start_day:4,starting_owed:0,tax_rate:0,break_minutes:30,categories:DEF_CATS});}
+    if(f.data){
+      const s=f.data;
+      cfg={baseRate:+s.base_rate,otRate:+s.ot_rate,otThreshold:+s.ot_threshold,weekStartDay:s.week_start_day,startingOwed:+s.starting_owed||0,taxRate:+s.tax_rate||0,breakMinutes:+(s.break_minutes||30)};
+      cats=s.categories||DEF_CATS;
+    }else{
+      await sb.from('user_settings').insert({user_id:uid,base_rate:18,ot_rate:27,ot_threshold:40,week_start_day:4,starting_owed:0,tax_rate:0,break_minutes:30,categories:DEF_CATS});
+    }
   }catch(e){toast('Error loading: '+e.message);}
 }
 
-// ═══ DB HELPERS ═══
+// ═══ DB ═══
 async function dbIns(table,data){const{data:row,error}=await sb.from(table).insert({user_id:user.id,...data}).select().single();if(error)throw error;return row;}
 async function dbUpd(table,id,data){const{error}=await sb.from(table).update(data).eq('id',id).eq('user_id',user.id);if(error)throw error;}
 async function dbDel(table,id){const{error}=await sb.from(table).delete().eq('id',id).eq('user_id',user.id);if(error)throw error;}
@@ -491,103 +510,67 @@ function uid(){return Date.now().toString(36)+(++_ic).toString(36);}
 function pad(n){return String(n).padStart(2,'0');}
 function todayStr(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
 function fmtD(s){return new Date(s+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});}
-function fmtRng(ws,we){const a=new Date(ws+'T12:00:00'),b=new Date(we+'T12:00:00');return a.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' \u2013 '+b.toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+function fmtRng(a,b){return new Date(a+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+' \u2013 '+new Date(b+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});}
 function t2m(t){const[h,m]=t.split(':').map(Number);return h*60+m;}
 function shHrs(s,e){let d=t2m(e)-t2m(s);if(d<0)d+=1440;return d/60;}
-
 function wkStart(ds){const d=new Date(ds+'T12:00:00'),diff=(d.getDay()-cfg.weekStartDay+7)%7;d.setDate(d.getDate()-diff);return d.toISOString().split('T')[0];}
 function wkEnd(ws){const d=new Date(ws+'T12:00:00');d.setDate(d.getDate()+6);return d.toISOString().split('T')[0];}
-
 function getPayPeriodEnd(ws){
   const ov=weekOverrides.find(o=>o.weekStart===ws);
   if(ov){const d=new Date(ws+'T12:00:00');d.setDate(d.getDate()+6-ov.daysCut);return d.toISOString().split('T')[0];}
   return wkEnd(ws);
 }
 function getPayPeriodStart(ds){
-  const nws=wkStart(ds);
-  const effEnd=getPayPeriodEnd(nws);
+  const nws=wkStart(ds),effEnd=getPayPeriodEnd(nws);
   if(ds>effEnd){const d=new Date(nws+'T12:00:00');d.setDate(d.getDate()+7);return d.toISOString().split('T')[0];}
   return nws;
 }
 
-// Hours formatting: decimal stays, hm = hours + minutes breakdown with formula
+// BREAK — paidHours is stored on shift at time of save (independent of current cfg)
+function paidHrs(s){return s.paidHours!==undefined&&s.paidHours!==null?s.paidHours:s.hours;}
+
+// Hours detail formatter: keeps decimal, also shows h+m with formula
 function fmtHrsFull(h){
-  const dec=h.toFixed(1)+'h';
-  const wh=Math.floor(h),mins=Math.round((h-wh)*60);
-  const hm=wh+'h '+pad(mins)+'m';
-  const decPart=(h-wh);
-  const formula=mins===0?(wh+'h exactly'):(wh+'h + '+decPart.toFixed(1).replace('0','')+'  60 = '+mins+'min');
+  const dec=h.toFixed(1)+'h',wh=Math.floor(h),mins=Math.round((h-wh)*60),hm=wh+'h '+pad(mins)+'m';
+  const dp=(h-wh),formula=mins===0?wh+'h exactly':wh+'h + '+dp.toFixed(1).replace('0.','.')+'  60 = '+mins+'min';
   return{dec,hm,formula};
 }
 
-// Break-adjusted paid hours for a shift
-function paidHrs(s){
-  if(s.breakTaken){return Math.max(0,s.hours-(cfg.breakMinutes||30)/60);}
-  return s.hours;
-}
-
-// Weekly calculation using stored rates from first shift; uses paid hours for OT/earnings
 function calcWk(wss){
   if(!wss.length)return{tot:0,paidTot:0,reg:0,ot:0,earned:0};
   const s0=[...wss].sort((a,b)=>a.date.localeCompare(b.date))[0];
   const br=s0.baseRate||cfg.baseRate,otr=s0.otRate||cfg.otRate,thr=s0.otThreshold||cfg.otThreshold;
-  const tot=wss.reduce((s,x)=>s+x.hours,0);
-  const paidTot=wss.reduce((s,x)=>s+paidHrs(x),0);
+  const tot=wss.reduce((s,x)=>s+x.hours,0),paidTot=wss.reduce((s,x)=>s+paidHrs(x),0);
   const reg=Math.min(paidTot,thr),ot=Math.max(0,paidTot-thr);
   return{tot,paidTot,reg,ot,earned:reg*br+ot*otr};
 }
-
-// Per-shift pay, respecting OT boundary accumulating across the period
 function perShiftPay(shifts){
   if(!shifts.length)return[];
   const sorted=[...shifts].sort((a,b)=>a.date.localeCompare(b.date));
-  const s0=sorted[0];
-  const br=s0.baseRate||cfg.baseRate,otr=s0.otRate||cfg.otRate,thr=s0.otThreshold||cfg.otThreshold;
+  const s0=sorted[0],br=s0.baseRate||cfg.baseRate,otr=s0.otRate||cfg.otRate,thr=s0.otThreshold||cfg.otThreshold;
   let run=0;
-  return sorted.map(s=>{
-    const ph=paidHrs(s),prev=run;run+=ph;
-    const sReg=Math.max(0,Math.min(ph,thr-prev));
-    const sOT=Math.max(0,ph-sReg);
-    return{id:s.id,pay:sReg*br+sOT*otr};
-  });
+  return sorted.map(s=>{const ph=paidHrs(s),prev=run;run+=ph;const sR=Math.max(0,Math.min(ph,thr-prev)),sO=Math.max(0,ph-sR);return{id:s.id,pay:sR*br+sO*otr};});
 }
-
 function netOf(g){return g*(1-(cfg.taxRate||0)/100);}
-function allEarned(){
-  const m={};shts.forEach(s=>{const ws=getPayPeriodStart(s.date);(m[ws]=m[ws]||[]).push(s);});
-  return Object.values(m).reduce((s,w)=>s+calcWk(w).earned,0);
-}
+function allEarned(){const m={};shts.forEach(s=>{const ws=getPayPeriodStart(s.date);(m[ws]=m[ws]||[]).push(s);});return Object.values(m).reduce((s,w)=>s+calcWk(w).earned,0);}
 function totalPaid(){return pays.reduce((s,p)=>s+p.amount,0);}
 function owed(){return Math.max(0,allEarned()+(cfg.startingOwed||0)-totalPaid());}
-
 function getPeriodRange(type,off){
   const now=new Date();
-  if(type==='week'){
-    const ws=wkStart(todayStr());const d=new Date(ws+'T12:00:00');d.setDate(d.getDate()+off*7);
-    const start=d.toISOString().split('T')[0],end=wkEnd(start);
-    return{start,end,label:(off===0?'This week \u00B7 ':'')+fmtRng(start,end)};
-  }
-  if(type==='month'){
-    const d=new Date(now.getFullYear(),now.getMonth()+off,1);
-    const y=d.getFullYear(),m=d.getMonth();
-    const start=y+'-'+pad(m+1)+'-01',end=y+'-'+pad(m+1)+'-'+pad(new Date(y,m+1,0).getDate());
-    return{start,end,label:(off===0?'This month \u00B7 ':'')+d.toLocaleDateString('en-US',{month:'long',year:'numeric'})};
-  }
-  const y=now.getFullYear()+off;
-  return{start:y+'-01-01',end:y+'-12-31',label:(off===0?'This year \u00B7 ':'')+String(y)};
+  if(type==='week'){const ws=wkStart(todayStr());const d=new Date(ws+'T12:00:00');d.setDate(d.getDate()+off*7);const start=d.toISOString().split('T')[0],end=wkEnd(start);return{start,end,label:(off===0?'This week \u00B7 ':'')+fmtRng(start,end)};}
+  if(type==='month'){const d=new Date(now.getFullYear(),now.getMonth()+off,1);const y=d.getFullYear(),m=d.getMonth();const start=y+'-'+pad(m+1)+'-01',end=y+'-'+pad(m+1)+'-'+pad(new Date(y,m+1,0).getDate());return{start,end,label:(off===0?'This month \u00B7 ':'')+d.toLocaleDateString('en-US',{month:'long',year:'numeric'})};}
+  const y=now.getFullYear()+off;return{start:y+'-01-01',end:y+'-12-31',label:(off===0?'This year \u00B7 ':'')+String(y)};
 }
 
-// ═══ AUTO-SUGGEST BREAK ═══
-function checkBreakSuggest(){
-  const s=document.getElementById('ts').value,e=document.getElementById('te').value;
-  if(!s||!e)return;
-  if(shHrs(s,e)>=6)document.getElementById('t-break').checked=true;
+// Update break label text from current settings
+function updateBreakLabels(){
+  const lbl=(cfg.breakMinutes||30)+'-min break deducted?';
+  const a=document.getElementById('t-break-lbl'),b=document.getElementById('ss-break-lbl');
+  if(a)a.textContent=lbl;if(b)b.textContent=lbl;
 }
-function checkBreakSuggestEdit(){
-  const s=document.getElementById('ss-s').value,e=document.getElementById('ss-e').value;
-  if(!s||!e)return;
-  if(shHrs(s,e)>=6)document.getElementById('ss-break').checked=true;
-}
+
+function checkBreakSuggest(){const s=document.getElementById('ts').value,e=document.getElementById('te').value;if(s&&e&&shHrs(s,e)>=6)document.getElementById('t-break').checked=true;}
+function checkBreakSuggestEdit(){const s=document.getElementById('ss-s').value,e=document.getElementById('ss-e').value;if(s&&e&&shHrs(s,e)>=6)document.getElementById('ss-break').checked=true;}
 
 // ═══ NAV ═══
 const PAGES=['today','history','money','plan','settings'];
@@ -599,36 +582,40 @@ function renderToday(){
   const now=new Date(),ds=todayStr(),ws=getPayPeriodStart(ds),we=getPayPeriodEnd(ws);
   document.getElementById('hd').textContent='Today, '+now.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
   document.getElementById('hw').textContent='Week of '+fmtRng(ws,we);
+  updateBreakLabels();
   const wss=shts.filter(s=>s.date>=ws&&s.date<=we);
-  const{paidTot,ot,earned}=calcWk(wss);
-  const toOT=Math.max(0,cfg.otThreshold-paidTot);
+  const{paidTot,ot,earned}=calcWk(wss),toOT=Math.max(0,cfg.otThreshold-paidTot);
   document.getElementById('wh').textContent=paidTot.toFixed(1);
   document.getElementById('wg').textContent='$'+earned.toFixed(0);
   document.getElementById('wo').textContent=ot.toFixed(1);
   document.getElementById('wu').textContent=toOT>0?toOT.toFixed(1):'\u2014';
-  const taxSet=(cfg.taxRate||0)>0;
-  const thr=document.getElementById('th-row');
+  const taxSet=(cfg.taxRate||0)>0,thr=document.getElementById('th-row');
   if(taxSet&&earned>0){thr.style.display='flex';document.getElementById('th-v').textContent='$'+netOf(earned).toFixed(2)+' ('+cfg.taxRate+'% off)';}else{thr.style.display='none';}
   const ex=shts.find(s=>s.date===ds);
   document.getElementById('td-logged').style.display=ex?'block':'none';
   document.getElementById('td-form').style.display=ex?'none':'block';
   if(ex){
-    const ph=paidHrs(ex);
-   
-document.getElementById('td-info').innerHTML='<div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;"><span style="font-size:1.2rem;font-weight:800;color:var(--r4);">'+ex.start+' \u2013 '+ex.end+'</span><span style="color:var(--mt);font-size:.82rem;font-weight:600;">'+ph.toFixed(2)+'h paid</span>'+(ex.breakTaken?'<span style="color:var(--am);font-size:.75rem;font-weight:600;">\u2212'+(cfg.breakMinutes||30)+'m break</span>':'')+'</div>'+(ex.note?'<div style="margin-top:4px;font-size:.77rem;color:var(--mt);">'+ex.note+'</div>':'');
+    const ph=paidHrs(ex),brkMins=ex.breakTaken?Math.round((ex.hours-ph)*60):0;
+    document.getElementById('td-info').innerHTML='<div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;"><span style="font-size:1.2rem;font-weight:800;color:var(--r4);">'+ex.start+' \u2013 '+ex.end+'</span><span style="color:var(--mt);font-size:.82rem;font-weight:600;">'+ph.toFixed(2)+'h paid</span>'+(ex.breakTaken?'<span style="color:var(--am);font-size:.75rem;font-weight:600;">\u2212'+brkMins+'m break</span>':'')+'</div>'+(ex.note?'<div style="margin-top:4px;font-size:.77rem;color:var(--mt);">'+ex.note+'</div>':'');
   }
 }
 
 async function logShift(){
-  const s=document.getElementById('ts').value,e=document.getElementById('te').value,n=document.getElementById('tn').value.trim();
-  const bt=document.getElementById('t-break').checked;
+  const s=document.getElementById('ts').value,e=document.getElementById('te').value,n=document.getElementById('tn').value.trim(),bt=document.getElementById('t-break').checked;
   if(!s||!e){toast('Enter start and end time');return;}
   const h=shHrs(s,e);if(h<=0){toast('End time must be after start');return;}
+  // paid_hours stored at time of logging — independent of future settings changes
+  const ph=bt?Math.max(0,h-cfg.breakMinutes/60):h;
   const btn=document.querySelector('#td-form .btn');btn.textContent='Saving...';btn.disabled=true;
   try{
-    const ds=todayStr();const ex=shts.find(x=>x.date===ds);
-    if(ex){await dbUpd('shifts',ex.id,{start_time:s,end_time:e,hours:h,note:n,break_taken:bt});Object.assign(ex,{start:s,end:e,hours:h,note:n,breakTaken:bt});}
-    else{const row=await dbIns('shifts',{date:ds,start_time:s,end_time:e,hours:h,note:n,break_taken:bt,base_rate:cfg.baseRate,ot_rate:cfg.otRate,ot_threshold:cfg.otThreshold});shts.push({id:row.id,date:ds,start:s,end:e,hours:h,note:n,breakTaken:bt,baseRate:cfg.baseRate,otRate:cfg.otRate,otThreshold:cfg.otThreshold});}
+    const ds=todayStr(),ex=shts.find(x=>x.date===ds);
+    if(ex){
+      await dbUpd('shifts',ex.id,{start_time:s,end_time:e,hours:h,note:n,break_taken:bt,paid_hours:ph});
+      Object.assign(ex,{start:s,end:e,hours:h,note:n,breakTaken:bt,paidHours:ph});
+    }else{
+      const row=await dbIns('shifts',{date:ds,start_time:s,end_time:e,hours:h,note:n,break_taken:bt,paid_hours:ph,base_rate:cfg.baseRate,ot_rate:cfg.otRate,ot_threshold:cfg.otThreshold});
+      shts.push({id:row.id,date:ds,start:s,end:e,hours:h,note:n,breakTaken:bt,paidHours:ph,baseRate:cfg.baseRate,otRate:cfg.otRate,otThreshold:cfg.otThreshold});
+    }
     ['ts','te','tn'].forEach(x=>document.getElementById(x).value='');
     document.getElementById('t-break').checked=false;
     toast('\u273F Shift logged!');renderToday();
@@ -643,16 +630,15 @@ function openHrsDetail(){
   const el=document.getElementById('hrs-detail-content');
   if(!wss.length){el.innerHTML='<div class="empty"><p>No shifts this week yet</p></div>';op('sh-hrs-detail');return;}
   const{paidTot,ot}=calcWk(wss);
-  const brkMin=cfg.breakMinutes||30;
   let html='';
   wss.forEach(s=>{
-    const ph=paidHrs(s);
+    const ph=paidHrs(s),brkMins=s.breakTaken?Math.round((s.hours-ph)*60):0;
     const gross=fmtHrsFull(s.hours),paid=fmtHrsFull(ph);
     html+='<div class="drow"><div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:.85rem;font-weight:700;">'+fmtD(s.date)+'</span><span style="font-size:.78rem;color:var(--mt);">'+s.start+' \u2013 '+s.end+'</span></div><div style="font-size:.8rem;line-height:1.75;color:var(--mt);">';
     if(s.breakTaken){
       html+='Gross: <strong style="color:var(--tx);">'+gross.dec+' = '+gross.hm+'</strong>';
       if(gross.formula.indexOf('exactly')<0)html+=' <em style="font-size:.74rem;">('+gross.formula+')</em>';
-      html+='<br>Break: <strong style="color:var(--am);">\u2212'+brkMin+'min</strong><br>';
+      html+='<br>Break: <strong style="color:var(--am);">\u2212'+brkMins+'min</strong><br>';
       html+='Paid: <strong style="color:var(--r4);">'+paid.dec+' = '+paid.hm+'</strong>';
       if(paid.formula.indexOf('exactly')<0)html+=' <em style="font-size:.74rem;">('+paid.formula+')</em>';
     }else{
@@ -663,10 +649,9 @@ function openHrsDetail(){
     html+='</div></div>';
   });
   const totFmt=fmtHrsFull(paidTot);
-  html+='<div class="dtotal"><div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="font-weight:700;">Total paid hrs</span><span style="font-size:1.2rem;font-weight:800;color:var(--r4);">'+totFmt.dec+'</span></div><div style="font-size:.78rem;color:var(--mt);margin-top:5px;line-height:1.65;">'+totFmt.dec+' = '+totFmt.hm+'<br>How: '+Math.floor(paidTot)+'h '+totFmt.formula.replace(Math.floor(paidTot)+'h ','')+'</div>'+(ot>0?'<div style="margin-top:8px;font-size:.8rem;font-weight:700;color:var(--am);">\u26A1 '+ot.toFixed(2)+'h overtime (above '+cfg.otThreshold+'h threshold)</div>':'')+'</div>';
+  html+='<div class="dtotal"><div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="font-weight:700;">Total paid hrs</span><span style="font-size:1.2rem;font-weight:800;color:var(--r4);">'+totFmt.dec+'</span></div><div style="font-size:.78rem;color:var(--mt);margin-top:5px;line-height:1.65;">'+totFmt.dec+' = '+totFmt.hm+(totFmt.formula.indexOf('exactly')<0?'<br>How: '+Math.floor(paidTot)+'h '+totFmt.formula.replace(Math.floor(paidTot)+'h ',''):'')+'</div>'+(ot>0?'<div style="margin-top:8px;font-size:.8rem;font-weight:700;color:var(--am);">\u26A1 '+ot.toFixed(2)+'h overtime (above '+cfg.otThreshold+'h threshold)</div>':'')+'</div>';
   el.innerHTML=html;op('sh-hrs-detail');
 }
-
 function openGrossDetail(){
   const ds=todayStr(),ws=getPayPeriodStart(ds),we=getPayPeriodEnd(ws);
   const wss=shts.filter(s=>s.date>=ws&&s.date<=we).sort((a,b)=>a.date.localeCompare(b.date));
@@ -677,8 +662,8 @@ function openGrossDetail(){
   const payMap=new Map(perShiftPay(wss).map(x=>[x.id,x.pay]));
   let html='';
   wss.forEach(s=>{
-    const ph=paidHrs(s),pay=payMap.get(s.id)||0;
-    html+='<div class="drow" style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:.85rem;font-weight:700;">'+fmtD(s.date)+'</div><div style="font-size:.74rem;color:var(--mt);">'+ph.toFixed(2)+'h paid'+(s.breakTaken?' (incl. break)':'')+'</div></div><span style="font-weight:800;font-size:.95rem;color:var(--r4);">$'+pay.toFixed(2)+'</span></div>';
+    const ph=paidHrs(s),pay=payMap.get(s.id)||0,brkMins=s.breakTaken?Math.round((s.hours-ph)*60):0;
+    html+='<div class="drow" style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:.85rem;font-weight:700;">'+fmtD(s.date)+'</div><div style="font-size:.74rem;color:var(--mt);">'+ph.toFixed(2)+'h paid'+(s.breakTaken?' (\u2212'+brkMins+'m break)':'')+'</div></div><span style="font-weight:800;font-size:.95rem;color:var(--r4);">$'+pay.toFixed(2)+'</span></div>';
   });
   html+='<div class="dtotal"><div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:.8rem;color:var(--mt);">Regular '+reg.toFixed(2)+'h \u00D7 $'+br+'</span><span style="font-weight:700;">$'+(reg*br).toFixed(2)+'</span></div>'+(ot>0?'<div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:.8rem;color:var(--am);">OT '+ot.toFixed(2)+'h \u00D7 $'+otr+'</span><span style="font-weight:700;color:var(--am);">$'+(ot*otr).toFixed(2)+'</span></div>':'')+'<div style="display:flex;justify-content:space-between;border-top:1px solid var(--bd);padding-top:8px;margin-top:4px;"><span style="font-weight:800;">Total</span><span style="font-weight:800;font-size:1.1rem;color:var(--gn);">$'+earned.toFixed(2)+'</span></div></div>';
   el.innerHTML=html;op('sh-gross-detail');
@@ -690,32 +675,28 @@ function renderHistory(){
   if(!shts.length){el.innerHTML='<div class="empty"><p>No shifts yet \u2014 log your first one on Today</p></div>';return;}
   const groups={};
   [...shts].sort((a,b)=>b.date.localeCompare(a.date)).forEach(s=>{
-    const ps=getPayPeriodStart(s.date);
-    if(!groups[ps])groups[ps]=[];
-    groups[ps].push(s);
+    const ps=getPayPeriodStart(s.date);(groups[ps]=groups[ps]||[]).push(s);
   });
   let html='';
   Object.entries(groups).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([ps,gShifts])=>{
-    const we=getPayPeriodEnd(ps);
     const{paidTot,ot,earned}=calcWk(gShifts);
     const ov=weekOverrides.find(o=>o.weekStart===ps);
-    const hasOverflow=gShifts.some(s=>wkStart(s.date)!==ps);
     const minD=gShifts.reduce((m,s)=>s.date<m?s.date:m,gShifts[0].date);
     const maxD=gShifts.reduce((m,s)=>s.date>m?s.date:m,gShifts[0].date);
     const payMap=new Map(perShiftPay(gShifts).map(x=>[x.id,x.pay]));
-    const toggleHtml=!hasOverflow
-      ?'<label style="display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;"><input type="checkbox" class="wov"'+(ov?' checked':'')+' onchange="toggleWeekOverride(\''+ps+'\',this.checked)"><span style="font-size:.63rem;color:var(--mt);font-weight:600;">Short</span></label>'
-      :'<span style="font-size:.63rem;color:var(--am);font-weight:600;">\u2191 overflow</span>';
+    // Toggle always visible — consecutive short weeks are fully supported
+    const toggleHtml='<label class="wov-wrap"><input type="checkbox" class="wov"'+(ov?' checked':'')+' onchange="toggleWeekOverride(\''+ps+'\',this.checked)"><span class="wov-lbl">Short</span></label>';
     html+='<div class="whdr"><span>'+fmtRng(minD,maxD)+' \u00B7 '+paidTot.toFixed(1)+'h \u00B7 $'+earned.toFixed(2)+'</span><div style="display:flex;align-items:center;gap:6px;">'+(ot>0?'<span class="badge bot">'+ot.toFixed(1)+' OT</span>':'')+toggleHtml+'</div></div>';
     gShifts.sort((a,b)=>b.date.localeCompare(a.date)).forEach(s=>{
-      const ph=paidHrs(s),pay=payMap.get(s.id)||0;
-      const brkTag=s.breakTaken?'<span style="font-size:.67rem;color:var(--am);">\u2212'+(cfg.breakMinutes||30)+'m</span>':'';
-      html+='<div class="srow" onclick="openEdit(\''+s.id+'\')"><div class="sdot"></div><div class="sinf"><div class="sdate">'+fmtD(s.date)+'</div><div class="stime">'+s.start+' \u2013 '+s.end+(s.note?' \u00B7 '+s.note:'')+' '+brkTag+'</div></div><div class="sright"><div class="shrs">'+ph.toFixed(1)+'h</div><div class="spay">~$'+pay.toFixed(2)+'</div></div></div>';
+      const ph=paidHrs(s),pay=payMap.get(s.id)||0,brkMins=s.breakTaken?Math.round((s.hours-ph)*60):0;
+      const brkTag=s.breakTaken?'<span style="font-size:.67rem;color:var(--am);">\u2212'+brkMins+'m</span>':'';
+      // Overflow indicator: shift belongs to a different normal week (carried over from prev short week)
+      const overTag=wkStart(s.date)!==ps?'<span style="font-size:.64rem;color:var(--r4);font-weight:700;" title="Carried over from previous pay period">\u2191prev</span>':'';
+      html+='<div class="srow" onclick="openEdit(\''+s.id+'\')"><div class="sdot"></div><div class="sinf"><div class="sdate">'+fmtD(s.date)+' '+overTag+'</div><div class="stime">'+s.start+' \u2013 '+s.end+(s.note?' \u00B7 '+s.note:'')+' '+brkTag+'</div></div><div class="sright"><div class="shrs">'+ph.toFixed(1)+'h</div><div class="spay">~$'+pay.toFixed(2)+'</div></div></div>';
     });
   });
   el.innerHTML=html;
 }
-
 async function toggleWeekOverride(ws,on){
   try{
     if(on){const row=await dbIns('week_overrides',{week_start:ws,days_cut:1});weekOverrides.push({id:row.id,weekStart:row.week_start,daysCut:row.days_cut});}
@@ -727,7 +708,6 @@ async function toggleWeekOverride(ws,on){
 // ═══ MONEY ═══
 function setMoneyPeriod(p,btn){moneyPeriod=p;moneyOffset=0;btn.closest('.piltabs').querySelectorAll('.piltab').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderMoney();}
 function shiftMoneyOff(d){moneyOffset+=d;if(moneyOffset>0)moneyOffset=0;renderMoney();}
-
 function renderMoney(){
   const o=owed(),earned=allEarned(),paid=totalPaid(),taxSet=(cfg.taxRate||0)>0;
   document.getElementById('o-amt').textContent='$'+o.toFixed(2);
@@ -738,9 +718,9 @@ function renderMoney(){
   document.getElementById('mn-next').style.pointerEvents=moneyOffset>=0?'none':'auto';
   const paysP=pays.filter(p=>p.date>=range.start&&p.date<=range.end).sort((a,b)=>b.date.localeCompare(a.date));
   const expsP=exps.filter(e=>e.date>=range.start&&e.date<=range.end).sort((a,b)=>b.date.localeCompare(a.date));
-  document.getElementById('pays-list').innerHTML=paysP.length?paysP.map(p=>'<div class="litem"><div class="lico">\uD83D\uDCB5</div><div class="linf"><div class="lname">'+(p.note||'Payment received')+'</div><div class="lsub">'+fmtD(p.date)+'</div></div><div class="lact"><span class="lamt" style="color:var(--gn);">+$'+p.amount.toFixed(2)+'</span><button class="btn bs bsm" onclick="openConfirm(\'Remove this payment?\',()=>delPay(\''+p.id+'\'))">&#10005;</button></div></div>').join(''):'<div class="empty" style="padding:12px 0 2px;"><p>No payments in this period</p></div>';
+  document.getElementById('pays-list').innerHTML=paysP.length?paysP.map(p=>'<div class="litem"><div class="lico">\uD83D\uDCB5</div><div class="linf"><div class="lname">'+(p.note||'Payment received')+'</div><div class="lsub">'+fmtD(p.date)+'</div></div><div class="lact"><span class="lamt" style="color:var(--gn);">+$'+p.amount.toFixed(2)+'</span><button class="btn bs bsm" onclick="openConfirm(\'Remove?\',()=>delPay(\''+p.id+'\'))">&#10005;</button></div></div>').join(''):'<div class="empty" style="padding:12px 0 2px;"><p>No payments in this period</p></div>';
   const catMap=Object.fromEntries(cats.map(c=>[c.id,c]));
-  document.getElementById('exps-list').innerHTML=expsP.length?expsP.map(e=>{const c=catMap[e.catId]||{emoji:'\uD83D\uDCE6',name:'Other'};return'<div class="litem"><div class="lico">'+c.emoji+'</div><div class="linf"><div class="lname">'+e.name+'</div><div class="lsub">'+c.name+' \u00B7 '+fmtD(e.date)+'</div></div><div class="lact"><span class="lamt">$'+e.amount.toFixed(2)+'</span><button class="btn bs bsm" onclick="openConfirm(\'Delete expense?\',()=>delExp(\''+e.id+'\'))">&#10005;</button></div></div>';}).join(''):'<div class="empty" style="padding:12px 0 2px;"><p>No expenses in this period</p></div>';
+  document.getElementById('exps-list').innerHTML=expsP.length?expsP.map(e=>{const c=catMap[e.catId]||{emoji:'\uD83D\uDCE6',name:'Other'};return'<div class="litem"><div class="lico">'+c.emoji+'</div><div class="linf"><div class="lname">'+e.name+'</div><div class="lsub">'+c.name+' \u00B7 '+fmtD(e.date)+'</div></div><div class="lact"><span class="lamt">$'+e.amount.toFixed(2)+'</span><button class="btn bs bsm" onclick="openConfirm(\'Delete?\',()=>delExp(\''+e.id+'\'))">&#10005;</button></div></div>';}).join(''):'<div class="empty" style="padding:12px 0 2px;"><p>No expenses in this period</p></div>';
   const rEl=document.getElementById('recs-list'),rtEl=document.getElementById('rec-tot');
   if(!recs.length){rEl.innerHTML='<div class="empty" style="padding:12px 0 2px;"><p>No recurring payments</p></div>';rtEl.innerHTML='';return;}
   const tot=recs.reduce((s,r)=>s+r.amount,0);
@@ -751,7 +731,6 @@ function renderMoney(){
 // ═══ PLAN ═══
 function setPeriod(p,btn){planPeriod=p;planOffset=0;btn.closest('.piltabs').querySelectorAll('.piltab').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderPlan();}
 function shiftOff(d){planOffset+=d;if(planOffset>0)planOffset=0;renderPlan();}
-
 function renderPlan(){
   const avgPay=shts.length?allEarned()/shts.length:cfg.baseRate*7;
   document.getElementById('goals-list').innerHTML=gols.length?gols.map(g=>{const rem=Math.max(0,g.target-g.saved),pct=Math.min(100,g.target>0?g.saved/g.target*100:0),need=avgPay>0?Math.ceil(rem/avgPay):'?';return'<div class="goalcard"><div class="gname">'+g.name+'</div><div class="gtgt">$'+g.target.toFixed(0)+'</div><div class="gsub">$'+g.saved.toFixed(2)+' saved \u00B7 $'+rem.toFixed(2)+' to go</div><div class="pbar"><div class="pfill" style="width:'+pct+'%"></div></div><div class="gfoot"><span class="gshifts">~'+need+' more shift'+(need===1?'':'s')+'</span><div style="display:flex;gap:6px;"><button class="btn bs bsm" onclick="openAddSav(\''+g.id+'\')">+ Add</button><button class="btn bs bsm" style="color:var(--rd);background:var(--rdb);" onclick="openConfirm(\'Delete goal?\',()=>delGoal(\''+g.id+'\'))">&#10005;</button></div></div></div>';}).join(''):'<div class="empty" style="padding:4px 0 12px;"><p>Add a goal to start tracking</p></div>';
@@ -765,27 +744,26 @@ function renderPlan(){
   if(!pShifts.length&&!pExps.length){oEl.innerHTML='<p style="font-size:.8rem;color:var(--mt);font-weight:500;">No data for this period yet.</p>';return;}
   const wMap={};pShifts.forEach(s=>{const ws=getPayPeriodStart(s.date);(wMap[ws]=wMap[ws]||[]).push(s);});
   const pEarned=Object.values(wMap).reduce((sum,ws)=>sum+calcWk(ws).earned,0);
-  const pExpTotal=pExps.reduce((s,e)=>s+e.amount,0);
-  const recMo=recs.reduce((s,r)=>s+r.amount,0);
-  const recForCalc=planPeriod==='month'?recMo:planPeriod==='year'?recMo*12:0;
-  const taxSet=(cfg.taxRate||0)>0;
+  const pExpTotal=pExps.reduce((s,e)=>s+e.amount,0),recMo=recs.reduce((s,r)=>s+r.amount,0);
+  const recForCalc=planPeriod==='month'?recMo:planPeriod==='year'?recMo*12:0,taxSet=(cfg.taxRate||0)>0;
   const netAfter=pEarned-pExpTotal-recForCalc;
   const catMap=Object.fromEntries(cats.map(c=>[c.id,c]));
   const expDetail=pExps.length?pExps.map(e=>{const c=catMap[e.catId]||{emoji:'\uD83D\uDCE6'};return c.emoji+' '+e.name+': $'+e.amount.toFixed(2);}).join(' \u00B7 '):'';
   let recLine='';
-  if(recs.length){if(planPeriod==='week')recLine='<div class="snote">Monthly fixed costs (ref): $'+recMo.toFixed(2)+'/mo</div>';else if(planPeriod==='month')recLine='<div class="mrow"><span class="mlbl">Recurring</span><span class="mval" style="color:var(--rd);">-$'+recMo.toFixed(2)+'</span></div>';else recLine='<div class="mrow"><span class="mlbl">Recurring (year est.)</span><span class="mval" style="color:var(--rd);">-$'+(recMo*12).toFixed(2)+'</span></div>';}
+  if(recs.length){if(planPeriod==='week')recLine='<div class="snote">Monthly fixed costs (ref): $'+recMo.toFixed(2)+'/mo</div>';else if(planPeriod==='month')recLine='<div class="mrow"><span class="mlbl">Recurring</span><span class="mval" style="color:var(--rd);">-$'+recMo.toFixed(2)+'</span></div>';else recLine='<div class="mrow"><span class="mlbl">Recurring (year)</span><span class="mval" style="color:var(--rd);">-$'+(recMo*12).toFixed(2)+'</span></div>';}
   oEl.innerHTML='<div class="mrow"><span class="mlbl">Earned</span><span class="mval" style="color:var(--gn);">+$'+pEarned.toFixed(2)+'</span></div>'+(pExpTotal>0?'<div class="mrow"><span class="mlbl">Expenses ('+pExps.length+')</span><span class="mval" style="color:var(--rd);">-$'+pExpTotal.toFixed(2)+'</span></div>'+(expDetail?'<div class="snote">'+expDetail+'</div>':''):'')+ recLine+((pExpTotal>0||recForCalc>0)?'<div class="mrow" style="border-top:1px solid var(--bd);margin-top:4px;padding-top:10px;"><span style="font-weight:700;font-size:.87rem;">Net</span><span style="font-weight:800;font-size:1.05rem;color:'+(netAfter>=0?'var(--gn)':'var(--rd)')+';">$'+netAfter.toFixed(2)+'</span></div>':'')+(taxSet?'<div class="mrow"><span style="font-weight:700;font-size:.87rem;">Est. take-home</span><span style="font-weight:800;font-size:1.05rem;color:var(--gn);">$'+Math.max(0,netOf(pEarned)-pExpTotal-recForCalc).toFixed(2)+'</span></div>':'');
 }
 
 // ═══ SETTINGS ═══
 function renderSettings(){
   document.getElementById('s-base').value=cfg.baseRate;document.getElementById('s-thr').value=cfg.otThreshold;document.getElementById('s-ot').value=cfg.otRate;document.getElementById('s-tax').value=cfg.taxRate||0;document.getElementById('s-wk').value=cfg.weekStartDay;document.getElementById('s-ow').value=cfg.startingOwed||0;document.getElementById('s-brk').value=cfg.breakMinutes||30;
-  renderCats();
+  renderCats();updateBreakLabels();
 }
 async function saveCfg(){
   const br=parseFloat(document.getElementById('s-base').value),thr=parseFloat(document.getElementById('s-thr').value),ot=parseFloat(document.getElementById('s-ot').value),tax=parseFloat(document.getElementById('s-tax').value)||0,ws=parseInt(document.getElementById('s-wk').value),so=parseFloat(document.getElementById('s-ow').value)||0,brk=parseInt(document.getElementById('s-brk').value)||30;
   if(isNaN(br)||isNaN(thr)||isNaN(ot)){toast('Fill in all rate fields');return;}
   cfg={...cfg,baseRate:br,otThreshold:thr,otRate:ot,taxRate:tax,weekStartDay:ws,startingOwed:so,breakMinutes:brk};
+  updateBreakLabels();
   try{await sb.from('user_settings').upsert({user_id:user.id,base_rate:br,ot_rate:ot,ot_threshold:thr,week_start_day:ws,starting_owed:so,tax_rate:tax,break_minutes:brk,categories:cats},{onConflict:'user_id'});toast('Settings saved \u2713');}
   catch(e){toast('Error: '+e.message);}
 }
@@ -797,19 +775,35 @@ function op(id){document.getElementById(id).classList.add('on');}
 function cl(id){document.getElementById(id).classList.remove('on');}
 function oc(el){if(event.target===el)el.classList.remove('on');}
 
-function openPast(){_eid=null;document.getElementById('ss-ttl').textContent='Add past shift';document.getElementById('ss-d').value=todayStr();['ss-s','ss-e','ss-n'].forEach(x=>document.getElementById(x).value='');document.getElementById('ss-break').checked=false;document.getElementById('ss-del').style.display='none';setBusy('ss-save',false,'Save');op('sh-shift');}
+function openPast(){
+  _eid=null;document.getElementById('ss-ttl').textContent='Add past shift';document.getElementById('ss-d').value=todayStr();
+  ['ss-s','ss-e','ss-n'].forEach(x=>document.getElementById(x).value='');
+  document.getElementById('ss-break').checked=false;document.getElementById('ss-del').style.display='none';
+  updateBreakLabels();setBusy('ss-save',false,'Save');op('sh-shift');
+}
 function openEdit(id){
   const s=shts.find(x=>x.id===id);if(!s)return;
-  _eid=id;document.getElementById('ss-ttl').textContent='Edit shift';document.getElementById('ss-d').value=s.date;document.getElementById('ss-s').value=s.start;document.getElementById('ss-e').value=s.end;document.getElementById('ss-n').value=s.note||'';document.getElementById('ss-break').checked=s.breakTaken||false;document.getElementById('ss-del').style.display='block';setBusy('ss-save',false,'Save');op('sh-shift');
+  _eid=id;document.getElementById('ss-ttl').textContent='Edit shift';document.getElementById('ss-d').value=s.date;document.getElementById('ss-s').value=s.start;document.getElementById('ss-e').value=s.end;document.getElementById('ss-n').value=s.note||'';
+  document.getElementById('ss-break').checked=s.breakTaken||false;
+  document.getElementById('ss-del').style.display='block';
+  updateBreakLabels();setBusy('ss-save',false,'Save');op('sh-shift');
 }
 async function saveShift(){
   const d=document.getElementById('ss-d').value,s=document.getElementById('ss-s').value,e=document.getElementById('ss-e').value,n=document.getElementById('ss-n').value.trim(),bt=document.getElementById('ss-break').checked;
   if(!d||!s||!e){toast('Fill in all fields');return;}
   const h=shHrs(s,e);if(h<=0){toast('End time must be after start');return;}
+  // Always compute paid_hours fresh for the break state at time of this save
+  const ph=bt?Math.max(0,h-cfg.breakMinutes/60):h;
   setBusy('ss-save',true,'Save');
   try{
-    if(_eid){await dbUpd('shifts',_eid,{date:d,start_time:s,end_time:e,hours:h,note:n,break_taken:bt});const i=shts.findIndex(x=>x.id===_eid);if(i>-1)shts[i]={...shts[i],date:d,start:s,end:e,hours:h,note:n,breakTaken:bt};}
-    else{const ex=shts.find(x=>x.date===d);if(ex){await dbUpd('shifts',ex.id,{start_time:s,end_time:e,hours:h,note:n,break_taken:bt});Object.assign(ex,{start:s,end:e,hours:h,note:n,breakTaken:bt});}else{const row=await dbIns('shifts',{date:d,start_time:s,end_time:e,hours:h,note:n,break_taken:bt,base_rate:cfg.baseRate,ot_rate:cfg.otRate,ot_threshold:cfg.otThreshold});shts.push({id:row.id,date:d,start:s,end:e,hours:h,note:n,breakTaken:bt,baseRate:cfg.baseRate,otRate:cfg.otRate,otThreshold:cfg.otThreshold});}}
+    if(_eid){
+      await dbUpd('shifts',_eid,{date:d,start_time:s,end_time:e,hours:h,note:n,break_taken:bt,paid_hours:ph});
+      const i=shts.findIndex(x=>x.id===_eid);if(i>-1)shts[i]={...shts[i],date:d,start:s,end:e,hours:h,note:n,breakTaken:bt,paidHours:ph};
+    }else{
+      const ex=shts.find(x=>x.date===d);
+      if(ex){await dbUpd('shifts',ex.id,{start_time:s,end_time:e,hours:h,note:n,break_taken:bt,paid_hours:ph});Object.assign(ex,{start:s,end:e,hours:h,note:n,breakTaken:bt,paidHours:ph});}
+      else{const row=await dbIns('shifts',{date:d,start_time:s,end_time:e,hours:h,note:n,break_taken:bt,paid_hours:ph,base_rate:cfg.baseRate,ot_rate:cfg.otRate,ot_threshold:cfg.otThreshold});shts.push({id:row.id,date:d,start:s,end:e,hours:h,note:n,breakTaken:bt,paidHours:ph,baseRate:cfg.baseRate,otRate:cfg.otRate,otThreshold:cfg.otThreshold});}
+    }
     cl('sh-shift');toast('Shift saved \u2713');rndr(cur);
   }catch(err){toast('Error: '+err.message);}finally{setBusy('ss-save',false,'Save');}
 }
@@ -856,8 +850,7 @@ async function saveGoal(){
 function openAddSav(id){_gid=id;document.getElementById('sas-am').value='';op('sh-addsav');}
 async function doAddSav(){
   const am=parseFloat(document.getElementById('sas-am').value);if(isNaN(am)||am<=0){toast('Enter an amount');return;}
-  const g=gols.find(x=>x.id===_gid);if(!g)return;
-  const nv=Math.min(g.target,g.saved+am);
+  const g=gols.find(x=>x.id===_gid);if(!g)return;const nv=Math.min(g.target,g.saved+am);
   try{await dbUpd('goals',_gid,{saved:nv});g.saved=nv;cl('sh-addsav');toast('Savings updated \u2713');renderPlan();}
   catch(e){toast('Error: '+e.message);}
 }
