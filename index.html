@@ -18,6 +18,7 @@
   --nh:62px;--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);--rr:16px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+[hidden]{display:none!important;}
 body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--tx);min-height:100dvh;-webkit-tap-highlight-color:transparent;overflow-x:hidden;}
 #auth{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;padding:20px;z-index:500;padding-top:calc(var(--st) + 20px);}
 .auth-card{background:var(--sf);border-radius:20px;padding:32px 24px;width:100%;max-width:380px;border:1px solid var(--bd);box-shadow:0 4px 24px rgba(232,105,138,.12);}
@@ -250,6 +251,9 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
         <button class="btn bp" onclick="logShift()">Log shift</button>
       </div>
       <div id="td-auto-form" hidden>
+        <p class="snote" id="auto-shift-status" style="margin:0 0 10px;" hidden></p>
+        <button type="button" class="btn bp" id="auto-start-btn" onclick="startAutoShift()">Start shift</button>
+        <button type="button" class="btn bp" id="auto-end-btn" onclick="endAutoShift()" hidden>End shift</button>
         <div class="auto-break-prompt" id="auto-break-prompt" hidden>
           <div class="auto-break-question" id="auto-break-question">Did you take a break?</div>
           <div class="auto-break-sub" id="auto-break-sub">Please confirm before saving today's shift.</div>
@@ -258,10 +262,6 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
             <button type="button" class="btn auto-break-no" id="auto-break-no" onclick="resolveAutoBreak(false)">No break</button>
           </div>
         </div>
-        <div class="ctitle" id="auto-shift-title">Today's shift</div>
-        <p class="snote" id="auto-shift-status" style="margin:0 0 12px;">Ready to start.</p>
-        <button class="btn bp" id="auto-start-btn" onclick="startAutoShift()">Start shift</button>
-        <button class="btn bp" id="auto-end-btn" onclick="endAutoShift()" hidden>End shift</button>
       </div>
     </div>
   </div>
@@ -510,7 +510,7 @@ let cfg={baseRate:18,otRate:27,otThreshold:40,weekStartDay:4,startingOwed:0,taxR
 const DEF_CATS=[{id:'rent',name:'Rent',emoji:'\uD83C\uDFE0'},{id:'spending',name:'Spending money',emoji:'\uD83D\uDCB3'},{id:'other',name:'Other',emoji:'\uD83D\uDCE6'}];
 let cats=[...DEF_CATS],shts=[],exps=[],recs=[],pays=[],gols=[],goalContributions=[],weekOverrides=[],goalHistoryReady=false;
 let cur='today',planPeriod='week',planOffset=0,moneyPeriod='week',moneyOffset=0;
-let _eid=null,_gid=null,_contributionId=null,_lastRecurringSyncDate='',pendingAutoShiftEndAt=null;
+let _eid=null,_gid=null,_contributionId=null,_lastRecurringSyncDate='',pendingAutoBreakShiftId=null;
 
 // ═══ BOOT ═══
 document.addEventListener('DOMContentLoaded',()=>{
@@ -562,6 +562,7 @@ async function signInWithGoogle(){
 // ═══ LOAD ═══
 async function loadAll(){
   const uid=user.id;
+  pendingAutoBreakShiftId=null;
   try{
     const[a,b,c,d,e,f,g,h]=await Promise.all([
       sb.from('shifts').select('*').eq('user_id',uid),
@@ -591,7 +592,7 @@ async function loadAll(){
       const s=f.data;
       cfg={baseRate:+s.base_rate,otRate:+s.ot_rate,otThreshold:+s.ot_threshold,weekStartDay:s.week_start_day,startingOwed:+s.starting_owed||0,taxRate:+s.tax_rate||0,breakMinutes:+(s.break_minutes||30),weeklySavingsTarget:+s.weekly_savings_target||0,shiftLoggingMode:s.shift_logging_mode==='automatic'?'automatic':'manual',breakAutoThresholdHours:+s.break_auto_threshold_hours||6,activeShiftStartedAt:s.active_shift_started_at||null};
       cats=s.categories||DEF_CATS;
-      // Recover from the rare case where a shift insert succeeded but clearing its active marker failed.
+      // If a shift row was saved but clearing the active marker failed, repair it by matching date + start time.
       if(cfg.activeShiftStartedAt){
         const activeAt=new Date(cfg.activeShiftStartedAt);
         if(!Number.isNaN(activeAt.getTime())&&shts.some(x=>x.date===localDateStr(activeAt)&&x.start===localTimeStr(activeAt))){
@@ -741,32 +742,35 @@ function renderToday(){
   const ex=shts.find(s=>s.date===ds);
   const autoMode=cfg.shiftLoggingMode==='automatic',activeStart=cfg.activeShiftStartedAt?new Date(cfg.activeShiftStartedAt):null;
   const activeValid=activeStart&&!Number.isNaN(activeStart.getTime());
-  document.getElementById('td-logged').style.display=ex?'block':'none';
-  document.getElementById('td-form').style.display=(ex&&!(autoMode&&activeValid))?'none':'block';
+  const pendingBreakShift=pendingAutoBreakShiftId?shts.find(s=>s.id===pendingAutoBreakShiftId):null;
+  const waitingForBreak=!!pendingBreakShift;
+  const shownShift=waitingForBreak?null:ex;
+  document.getElementById('td-logged').style.display=shownShift?'block':'none';
+  document.getElementById('td-form').style.display=(autoMode&&waitingForBreak)||!ex?'block':'none';
   document.getElementById('td-manual-form').style.display=autoMode?'none':'block';
   const autoPanel=document.getElementById('td-auto-form');
   autoPanel.hidden=!autoMode;
   if(autoMode){
     const status=document.getElementById('auto-shift-status'),startBtn=document.getElementById('auto-start-btn'),endBtn=document.getElementById('auto-end-btn'),breakPrompt=document.getElementById('auto-break-prompt');
-    breakPrompt.hidden=true;
-    if(activeValid){
-      startBtn.hidden=true;endBtn.hidden=false;endBtn.disabled=false;endBtn.textContent='End shift';
-      if(pendingAutoShiftEndAt){
-        const pendingEnd=new Date(pendingAutoShiftEndAt),pendingHours=shHrs(localTimeStr(activeStart),localTimeStr(pendingEnd)),threshold=Number(cfg.breakAutoThresholdHours)||6;
-        status.textContent='One quick check before saving.';
-        document.getElementById('auto-break-question').textContent='Did you take a '+cfg.breakMinutes+'-minute break?';
-        document.getElementById('auto-break-sub').textContent='This shift was '+pendingHours.toFixed(2)+' hours, under the '+threshold+'-hour threshold. Please confirm whether a break should be deducted.';
-        breakPrompt.hidden=false;endBtn.hidden=true;
-      }else{
-        status.textContent='Started '+fmtD(localDateStr(activeStart))+' at '+localTimeStr(activeStart)+'.';
-      }
+    // Mutually exclusive states: Start -> End (+ start hint) -> Break question -> Today's shift.
+    startBtn.hidden=activeValid||waitingForBreak||!!ex;
+    endBtn.hidden=!activeValid||waitingForBreak;
+    status.hidden=!activeValid||waitingForBreak;
+    breakPrompt.hidden=!waitingForBreak;
+    if(waitingForBreak){
+      document.getElementById('auto-break-question').textContent='Did you take a '+cfg.breakMinutes+'-minute break?';
+      document.getElementById('auto-break-sub').textContent='Your shift was '+pendingBreakShift.hours.toFixed(2)+' hours. Confirm whether a break should be deducted.';
+      document.getElementById('auto-break-yes').disabled=false;
+      document.getElementById('auto-break-no').disabled=false;
+    }else if(activeValid){
+      endBtn.disabled=false;endBtn.textContent='End shift';
+      status.textContent='Started '+fmtD(localDateStr(activeStart))+' at '+localTimeStr(activeStart)+'.';
     }else{
-      status.textContent='Ready when you are.';
-      startBtn.hidden=false;endBtn.hidden=true;startBtn.disabled=false;startBtn.textContent='Start shift';
+      startBtn.disabled=false;startBtn.textContent='Start shift';
     }
   }
-  if(ex){
-    const ph=paidHrs(ex),brkMins=ex.breakTaken?Math.round((ex.hours-ph)*60):0;
+  if(shownShift){
+    const ex=shownShift,ph=paidHrs(shownShift),brkMins=shownShift.breakTaken?Math.round((shownShift.hours-ph)*60):0;
     document.getElementById('td-info').innerHTML='<div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;"><span style="font-size:1.2rem;font-weight:800;color:var(--r4);">'+ex.start+' \u2013 '+ex.end+'</span><span style="color:var(--mt);font-size:.82rem;font-weight:600;">'+ph.toFixed(2)+'h paid</span>'+(ex.breakTaken?'<span style="color:var(--am);font-size:.75rem;font-weight:600;">\u2212'+brkMins+'m break</span>':'')+'</div>'+(ex.note?'<div style="margin-top:4px;font-size:.77rem;color:var(--mt);">'+ex.note+'</div>':'');
   }
 }
@@ -797,9 +801,13 @@ async function setActiveShiftStartedAt(value){
   if(error)throw error;
   cfg.activeShiftStartedAt=value;
 }
+async function clearAutoShiftState(){
+  const{error}=await sb.from('user_settings').update({active_shift_started_at:null}).eq('user_id',user.id);
+  if(error)throw error;
+  cfg.activeShiftStartedAt=null;
+}
 async function startAutoShift(){
   if(cfg.shiftLoggingMode!=='automatic'){toast('Automatic shift logging is disabled');return;}
-  pendingAutoShiftEndAt=null;document.getElementById('auto-break-prompt').hidden=true;
   if(cfg.activeShiftStartedAt){toast('A shift is already in progress');return;}
   const ds=todayStr();
   if(shts.some(s=>s.date===ds)){toast('A shift is already logged for today. Edit it from Today or History.');return;}
@@ -814,46 +822,77 @@ async function startAutoShift(){
 async function endAutoShift(){
   if(cfg.shiftLoggingMode!=='automatic'||!cfg.activeShiftStartedAt){toast('No active shift found');return;}
   const startAt=new Date(cfg.activeShiftStartedAt),endAt=new Date();endAt.setSeconds(0,0);
-  if(Number.isNaN(startAt.getTime())||endAt<=startAt){toast('Invalid shift start time');return;}
-  const ds=localDateStr(startAt),start=localTimeStr(startAt),end=localTimeStr(endAt),hours=shHrs(start,end);
-  if(hours<=0){toast('Shift duration must be greater than zero');return;}
-  if(shts.some(s=>s.date===ds)){
-    toast('A shift is already recorded for '+fmtD(ds)+'. Resolve that entry before ending this shift.');return;
-  }
-  const threshold=Number(cfg.breakAutoThresholdHours)||6;
-  if(hours<threshold&&cfg.breakMinutes>0){
-    pendingAutoShiftEndAt=endAt.toISOString();
-    const prompt=document.getElementById('auto-break-prompt');
-    document.getElementById('auto-break-question').textContent='Did you take a '+cfg.breakMinutes+'-minute break?';
-    document.getElementById('auto-break-sub').textContent='This shift was under '+threshold+' hours. Please confirm whether a break should be deducted.';
-    document.getElementById('auto-break-yes').disabled=false;document.getElementById('auto-break-no').disabled=false;
-    document.getElementById('auto-shift-status').textContent='One quick check before saving.';
-    document.getElementById('auto-end-btn').hidden=true;
-    prompt.hidden=false;
+  if(Number.isNaN(startAt.getTime())){
+    try{await clearAutoShiftState();toast('The invalid shift start was cancelled. You can start again.');renderToday();}
+    catch(e){toast('Could not cancel the invalid start: '+e.message);}
     return;
   }
-  await saveAutoShiftEnd(endAt,hours>=threshold&&cfg.breakMinutes>0);
+  const elapsedMinutes=Math.floor((endAt.getTime()-startAt.getTime())/60000);
+  // A start and end in the same minute is a cancelled start, not an invalid time entry.
+  if(elapsedMinutes<=0){
+    try{await clearAutoShiftState();toast('Shift start cancelled — 0-minute shifts are not saved.');renderToday();}
+    catch(e){toast('Could not cancel the shift start: '+e.message);}
+    return;
+  }
+  const hours=elapsedMinutes/60,threshold=Number(cfg.breakAutoThresholdHours)||6;
+  const endBtn=document.getElementById('auto-end-btn');endBtn.disabled=true;
+  await saveAutoShiftEnd(startAt,endAt,hours>=threshold&&cfg.breakMinutes>0,hours<threshold&&cfg.breakMinutes>0);
 }
 async function resolveAutoBreak(breakTaken){
-  if(!pendingAutoShiftEndAt)return;
+  const pending=pendingAutoBreakShiftId?shts.find(x=>x.id===pendingAutoBreakShiftId):null;
+  if(!pending)return;
   const yes=document.getElementById('auto-break-yes'),no=document.getElementById('auto-break-no');
   yes.disabled=true;no.disabled=true;
-  await saveAutoShiftEnd(new Date(pendingAutoShiftEndAt),breakTaken);
-}
-async function saveAutoShiftEnd(endAt,breakTaken){
-  const startAt=new Date(cfg.activeShiftStartedAt);
-  const ds=localDateStr(startAt),start=localTimeStr(startAt),end=localTimeStr(endAt),hours=shHrs(start,end);
-  const paidHours=breakTaken?Math.max(0,hours-cfg.breakMinutes/60):hours;
-  const yes=document.getElementById('auto-break-yes'),no=document.getElementById('auto-break-no'),endBtn=document.getElementById('auto-end-btn');
-  if(endBtn)endBtn.disabled=true;
   try{
-    const row=await dbIns('shifts',{date:ds,start_time:start,end_time:end,hours,note:'',break_taken:breakTaken,paid_hours:paidHours,base_rate:cfg.baseRate,ot_rate:cfg.otRate,ot_threshold:cfg.otThreshold});
-    shts.push({id:row.id,date:ds,start,end,hours,note:'',breakTaken,paidHours,baseRate:cfg.baseRate,otRate:cfg.otRate,otThreshold:cfg.otThreshold});
-    pendingAutoShiftEndAt=null;
-    try{await setActiveShiftStartedAt(null);}
-    catch(clearErr){cfg.activeShiftStartedAt=null;toast('Shift saved, but the active-session flag could not be cleared. Reload and check Today.');renderToday();return;}
-    toast(breakTaken?'Shift logged · break deducted':'Shift logged');renderToday();
+    if(breakTaken){
+      // The shift already exists with no break. Update that saved shift only after explicit confirmation.
+      const paidHours=Math.max(0,pending.hours-cfg.breakMinutes/60);
+      await dbUpd('shifts',pending.id,{break_taken:true,paid_hours:paidHours});
+      pending.breakTaken=true;pending.paidHours=paidHours;
+    }
+    pendingAutoBreakShiftId=null;
+    toast(breakTaken?'Break recorded':'Shift saved without a break');
+    renderToday();
   }catch(e){
+    yes.disabled=false;no.disabled=false;
+    toast('Could not update the break: '+e.message);
+  }
+}
+async function saveAutoShiftEnd(startAt,endAt,breakTaken,askAboutBreak){
+  const ds=localDateStr(startAt),start=localTimeStr(startAt),end=localTimeStr(endAt);
+  const elapsedMinutes=Math.floor((endAt.getTime()-startAt.getTime())/60000);
+  if(!Number.isFinite(elapsedMinutes)||elapsedMinutes<=0){
+    try{await clearAutoShiftState();toast('Shift start cancelled — 0-minute shifts are not saved.');renderToday();}
+    catch(e){toast('Could not cancel the shift start: '+e.message);}
+    return;
+  }
+  const hours=elapsedMinutes/60;
+  // For shifts below the threshold, save a normal no-break record BEFORE asking anything.
+  // If the page reloads before the answer, the saved row remains with no break deducted.
+  const paidHours=breakTaken?Math.max(0,hours-cfg.breakMinutes/60):hours;
+  try{
+    let existing=shts.find(x=>x.date===ds&&x.start===start);
+    if(!existing){
+      const row=await dbIns('shifts',{date:ds,start_time:start,end_time:end,hours,note:'',break_taken:breakTaken,paid_hours:paidHours,base_rate:cfg.baseRate,ot_rate:cfg.otRate,ot_threshold:cfg.otThreshold});
+      existing={id:row.id,date:ds,start,end,hours,note:'',breakTaken,paidHours,baseRate:cfg.baseRate,otRate:cfg.otRate,otThreshold:cfg.otThreshold};
+      shts.push(existing);
+    }
+    // Active start is the only persistent session marker. The question is intentionally in-memory only.
+    try{await clearAutoShiftState();}
+    catch(clearErr){
+      // The saved row is authoritative; loadAll() repairs the marker by matching its date + start time.
+      cfg.activeShiftStartedAt=null;
+      toast('Shift saved. Session cleanup will be retried next time you open the app.');
+    }
+    if(askAboutBreak){
+      pendingAutoBreakShiftId=existing.id;
+      renderToday();
+      return;
+    }
+    toast(breakTaken?'Shift logged · break deducted':'Shift logged');
+    renderToday();
+  }catch(e){
+    const yes=document.getElementById('auto-break-yes'),no=document.getElementById('auto-break-no'),endBtn=document.getElementById('auto-end-btn');
     if(yes)yes.disabled=false;if(no)no.disabled=false;if(endBtn)endBtn.disabled=false;
     toast('Could not log shift end: '+e.message);
   }
