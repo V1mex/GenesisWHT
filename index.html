@@ -93,8 +93,22 @@ input:focus,select:focus{border-color:var(--r4);background:#fff;}
 .gshifts{font-size:.74rem;font-weight:700;color:var(--r6);}
 .gforecast{margin-top:10px;padding-top:9px;border-top:1px solid rgba(155,58,92,.16);display:grid;gap:5px;}
 .gforecast-row{font-size:.72rem;color:var(--tx);line-height:1.4;}
-.gforecast-row strong{font-weight:800;color:var(--r6);}
-.gforecast-note{font-size:.67rem;color:var(--mt);line-height:1.45;}
+.gforecast-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:5px 0;border:0;background:transparent;text-align:left;color:var(--tx);font:inherit;font-size:.74rem;line-height:1.45;cursor:pointer;}
+.gforecast-toggle strong{font-weight:800;color:var(--r6);}
+.gforecast-arrow{color:var(--r6);font-size:.9rem;transition:transform .15s;flex-shrink:0;}
+.gforecast-toggle[aria-expanded="true"] .gforecast-arrow{transform:rotate(180deg);}
+.gforecast-note{font-size:.68rem;color:var(--mt);line-height:1.5;padding:2px 0 6px 2px;}
+.gforecast-note[hidden],.plan-breakdown[hidden]{display:none;}
+.gforecast-status{font-size:.68rem;color:var(--am);font-weight:700;margin-left:4px;}
+.mrow-disclosure{width:100%;border:0;background:transparent;text-align:left;font:inherit;cursor:pointer;gap:10px;}
+.mrow-disclosure .mlbl{flex:1;}
+.mrow-disclosure .mval{flex-shrink:0;}
+.mrow-disclosure .gforecast-arrow{font-size:.85rem;}
+.plan-breakdown{padding:2px 0 8px 4px;display:grid;gap:8px;}
+.plan-line{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;font-size:.75rem;line-height:1.4;}
+.plan-line-main{min-width:0;flex:1;}
+.plan-line-sub{display:block;font-size:.67rem;color:var(--mt);margin-top:2px;}
+.plan-line-amt{white-space:nowrap;font-weight:700;color:var(--tx);}
 .mrow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bd);}
 .mrow:last-child{border-bottom:none;}
 .mlbl{font-size:.83rem;color:var(--mt);font-weight:500;}
@@ -243,7 +257,7 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
     </div>
     <div class="card">
       <div class="row"><span class="ctitle" style="margin:0;">Recurring payments</span><button class="btn bs bsm" onclick="openRecSh()">+ Add</button></div>
-      <p class="snote">Tracked separately from regular expenses. A payment is included in the selected period's expenses only when its scheduled date falls within that period.</p>
+      <p class="snote">Past payments are saved as Regular Expenses. Upcoming payments are shown here as scheduled until their due date.</p>
       <div id="recs-list" style="margin-top:8px;"></div>
       <div id="rec-tot"></div>
     </div>
@@ -394,6 +408,7 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
 <div class="overlay" id="sh-addsav" onclick="oc(this)"><div class="sheet">
   <div class="spull"></div><div class="stitle">Add to savings</div>
   <div class="fg"><label>Amount ($)</label><input type="number" id="sas-am" step="0.01" placeholder="0.00"></div>
+  <div class="fg"><label>Date saved</label><input type="date" id="sas-date"></div>
   <div class="brow"><button class="btn bs" onclick="cl('sh-addsav')">Cancel</button><button class="btn bp" onclick="doAddSav()">Add</button></div>
 </div></div>
 
@@ -427,7 +442,7 @@ let cfg={baseRate:18,otRate:27,otThreshold:40,weekStartDay:4,startingOwed:0,taxR
 const DEF_CATS=[{id:'rent',name:'Rent',emoji:'\uD83C\uDFE0'},{id:'spending',name:'Spending money',emoji:'\uD83D\uDCB3'},{id:'other',name:'Other',emoji:'\uD83D\uDCE6'}];
 let cats=[...DEF_CATS],shts=[],exps=[],recs=[],pays=[],gols=[],goalContributions=[],weekOverrides=[],goalHistoryReady=false;
 let cur='today',planPeriod='week',planOffset=0,moneyPeriod='week',moneyOffset=0;
-let _eid=null,_gid=null;
+let _eid=null,_gid=null,_lastRecurringSyncDate='';
 
 // ═══ BOOT ═══
 document.addEventListener('DOMContentLoaded',()=>{
@@ -440,6 +455,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(session?.user){user=session.user;await loadAll();showApp();}
     else{user=null;showAuth();}
   });
+  // If the page stays open across midnight, materialize newly due recurring expenses.
+  setInterval(checkRecurringDateBoundary,60000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkRecurringDateBoundary();});
 });
 
 // Keyboard: scroll focused input into view when keyboard opens
@@ -494,8 +512,8 @@ async function loadAll(){
       breakTaken:r.break_taken||false,
       paidHours:r.paid_hours!=null?+r.paid_hours:(r.break_taken?Math.max(0,+r.hours-0.5):+r.hours)
     }));
-    exps=(b.data||[]).map(r=>({id:r.id,name:r.name,amount:+r.amount,catId:r.cat_id,date:r.date}));
-    recs=(c.data||[]).map(r=>({id:r.id,name:r.name,amount:+r.amount,day:r.day_of_month}));
+    exps=(b.data||[]).map(r=>({id:r.id,name:r.name,amount:+r.amount,catId:r.cat_id,date:r.date,recurringId:r.recurring_id||null,recurringOccurrenceDate:r.recurring_occurrence_date||null}));
+    recs=(c.data||[]).map(r=>({id:r.id,name:r.name,amount:+r.amount,day:r.day_of_month,startedOn:r.started_on||todayStr(),endedOn:r.ended_on||null,createdAt:r.created_at||null}));
     pays=(d.data||[]).map(r=>({id:r.id,amount:+r.amount,date:r.date,note:r.note||''}));
     gols=(e.data||[]).map(r=>({id:r.id,name:r.name,target:+r.target,saved:+r.saved,startedOn:r.started_on||todayStr(),historyStartedOn:r.history_started_on||todayStr()}));
     goalHistoryReady=!h.error;
@@ -509,6 +527,13 @@ async function loadAll(){
       await sb.from('user_settings').insert({user_id:uid,base_rate:18,ot_rate:27,ot_threshold:40,week_start_day:4,starting_owed:0,tax_rate:0,break_minutes:30,weekly_savings_target:0,categories:DEF_CATS});
     }
     if(!goalHistoryReady)toast('Savings forecasts need the SQL migration: goal_forecast_migration.sql');
+    try{
+      await syncRecurringExpenses();
+      _lastRecurringSyncDate=todayStr();
+    }catch(recErr){
+      _lastRecurringSyncDate=todayStr();
+      toast('Recurring history needs recurring_expense_history_migration.sql: '+recErr.message);
+    }
   }catch(e){toast('Error loading: '+e.message);}
 }
 
@@ -710,31 +735,37 @@ function openGrossDetail(){
 // ═══ HISTORY ═══
 function renderHistory(){
   const el=document.getElementById('hist-list');
-  if(!shts.length){el.innerHTML='<div class="empty"><p>No shifts yet \u2014 log your first one on Today</p></div>';return;}
   const groups={};
   [...shts].sort((a,b)=>b.date.localeCompare(a.date)).forEach(s=>{
     const ps=getPayPeriodStart(s.date);(groups[ps]=groups[ps]||[]).push(s);
   });
+  // Keep empty periods visible: this lets a user mark the current week Short on its first day.
+  const currentStart=getPayPeriodStart(todayStr());
+  if(!groups[currentStart])groups[currentStart]=[];
+  weekOverrides.forEach(o=>{if(!groups[o.weekStart])groups[o.weekStart]=[];});
+
   let html='';
   Object.entries(groups).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([ps,gShifts])=>{
     const{paidTot,ot,earned}=calcWk(gShifts);
     const ov=weekOverrides.find(o=>o.weekStart===ps);
-    const minD=gShifts.reduce((m,s)=>s.date<m?s.date:m,gShifts[0].date);
-    const maxD=gShifts.reduce((m,s)=>s.date>m?s.date:m,gShifts[0].date);
+    const range=getPayPeriodRange(ps);
+    const minD=gShifts.length?gShifts.reduce((m,s)=>s.date<m?s.date:m,gShifts[0].date):range.start;
+    const maxD=gShifts.length?gShifts.reduce((m,s)=>s.date>m?s.date:m,gShifts[0].date):range.end;
     const payMap=new Map(perShiftPay(gShifts).map(x=>[x.id,x.pay]));
-    // Toggle always visible — consecutive short weeks are fully supported
     const toggleHtml='<label class="wov-wrap"><input type="checkbox" class="wov"'+(ov?' checked':'')+' onchange="toggleWeekOverride(\''+ps+'\',this.checked)"><span class="wov-lbl">Short</span></label>';
-    html+='<div class="whdr"><span>'+fmtRng(minD,maxD)+' \u00B7 '+paidTot.toFixed(1)+'h \u00B7 '+fmtMoney(earned)+'</span><div style="display:flex;align-items:center;gap:6px;">'+(ot>0?'<span class="badge bot">'+ot.toFixed(1)+' OT</span>':'')+toggleHtml+'</div></div>';
+    const summary=gShifts.length?(paidTot.toFixed(1)+'h · '+fmtMoney(earned)):'No shifts';
+    html+='<div class="whdr"><span>'+fmtRng(minD,maxD)+' · '+summary+'</span><div style="display:flex;align-items:center;gap:6px;">'+(ot>0?'<span class="badge bot">'+ot.toFixed(1)+' OT</span>':'')+toggleHtml+'</div></div>';
+    if(!gShifts.length){html+='<div class="empty" style="padding:8px 0 12px;"><p>No shifts in this period</p></div>';return;}
     gShifts.sort((a,b)=>b.date.localeCompare(a.date)).forEach(s=>{
       const ph=paidHrs(s),pay=payMap.get(s.id)||0,brkMins=s.breakTaken?Math.round((s.hours-ph)*60):0;
-      const brkTag=s.breakTaken?'<span style="font-size:.67rem;color:var(--am);">\u2212'+brkMins+'m</span>':'';
-      // Overflow indicator: shift belongs to a different normal week (carried over from prev short week)
-      const overTag=wkStart(s.date)!==ps?'<span style="font-size:.64rem;color:var(--r4);font-weight:700;" title="Carried over from previous pay period">\u2191prev</span>':'';
-      html+='<div class="srow" onclick="openEdit(\''+s.id+'\')"><div class="sdot"></div><div class="sinf"><div class="sdate">'+fmtD(s.date)+' '+overTag+'</div><div class="stime">'+s.start+' \u2013 '+s.end+(s.note?' \u00B7 '+s.note:'')+' '+brkTag+'</div></div><div class="sright"><div class="shrs">'+ph.toFixed(1)+'h</div><div class="spay">~'+fmtMoney(pay)+'</div></div></div>';
+      const brkTag=s.breakTaken?'<span style="font-size:.67rem;color:var(--am);">−'+brkMins+'m</span>':'';
+      const overTag=wkStart(s.date)!==ps?'<span style="font-size:.64rem;color:var(--r4);font-weight:700;" title="Carried over from previous pay period">↑prev</span>':'';
+      html+='<div class="srow" onclick="openEdit(\''+s.id+'\')"><div class="sdot"></div><div class="sinf"><div class="sdate">'+fmtD(s.date)+' '+overTag+'</div><div class="stime">'+s.start+' – '+s.end+(s.note?' · '+s.note:'')+' '+brkTag+'</div></div><div class="sright"><div class="shrs">'+ph.toFixed(1)+'h</div><div class="spay">~'+fmtMoney(pay)+'</div></div></div>';
     });
   });
-  el.innerHTML=html;
+  el.innerHTML=html||'<div class="empty"><p>No shifts yet — log your first one on Today</p></div>';
 }
+
 async function toggleWeekOverride(ws,on){
   try{
     if(on){const row=await dbIns('week_overrides',{week_start:ws,days_cut:1});weekOverrides.push({id:row.id,weekStart:row.week_start,daysCut:row.days_cut});}
@@ -743,22 +774,95 @@ async function toggleWeekOverride(ws,on){
   }catch(e){toast('Error: '+e.message);}
 }
 
-// Recurring payments occur on their configured calendar day; day 29-31 is clamped to month-end.
-function recurringOccurrences(start,end){
-  const out=[];
-  const a=dateFromStr(start),b=dateFromStr(end);
+// Monthly recurring dates are clamped to month-end (e.g. day 31 -> Feb 28/29).
+function recurringDueDates(rule,start,end){
+  const from=rule.startedOn&&rule.startedOn>start?rule.startedOn:start;
+  const to=rule.endedOn&&rule.endedOn<end?rule.endedOn:end;
+  if(!from||!to||from>to)return [];
+  const out=[],a=dateFromStr(from),b=dateFromStr(to);
   let y=a.getUTCFullYear(),m=a.getUTCMonth();
   const lastY=b.getUTCFullYear(),lastM=b.getUTCMonth();
+  const rawDay=Number(rule.day);
+  const wantedDay=Number.isFinite(rawDay)?Math.min(31,Math.max(1,Math.trunc(rawDay))):1;
   while(y<lastY||(y===lastY&&m<=lastM)){
     const daysInMonth=new Date(Date.UTC(y,m+1,0)).getUTCDate();
-    recs.forEach(r=>{
-      const day=Math.min(Math.max(1,Math.trunc(Number(r.day)||1)),daysInMonth);
-      const date=dateToStr(new Date(Date.UTC(y,m,day)));
-      if(date>=start&&date<=end)out.push({id:r.id,name:r.name,amount:r.amount,date});
-    });
+    const date=dateToStr(new Date(Date.UTC(y,m,Math.min(wantedDay,daysInMonth))));
+    if(date>=from&&date<=to)out.push(date);
     m++;if(m>11){m=0;y++;}
   }
-  return out.sort((x,y)=>x.date.localeCompare(y.date)||x.name.localeCompare(y.name));
+  return out;
+}
+
+// Only future occurrences are projections. Once due, syncRecurringExpenses()
+// persists them in expenses and they are displayed/count as Regular Expenses.
+function recurringOccurrences(start,end){
+  const futureStart=addDays(todayStr(),1),out=[];
+  recs.filter(r=>!r.endedOn).forEach(r=>{
+    recurringDueDates(r,start>futureStart?start:futureStart,end).forEach(date=>{
+      out.push({id:r.id+'_'+date,recurringId:r.id,name:r.name,amount:r.amount,date,actual:false});
+    });
+  });
+  return out.sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name));
+}
+
+// For materialized recurring expenses the occurrence date is the source of truth.
+function expenseDate(e){return e.recurringId?(e.recurringOccurrenceDate||e.date):e.date;}
+
+// Combine persisted past occurrences with projected future ones. They share one
+// visual category (Regular Expense); the actual flag is only an implementation detail.
+function regularOccurrencesForPeriod(start,end){
+  const actual=exps.filter(e=>e.recurringId&&expenseDate(e)>=start&&expenseDate(e)<=end).map(e=>({
+    id:e.id,recurringId:e.recurringId,name:e.name,amount:e.amount,date:expenseDate(e),actual:true,catId:e.catId
+  }));
+  return actual.concat(recurringOccurrences(start,end)).sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name));
+}
+
+// Year view: summarize each recurring rule once, while preserving occurrence count.
+function regularDisplayGroups(items,aggregate){
+  if(!aggregate)return items.map(x=>({...x,count:1,total:x.amount}));
+  const groups=new Map();
+  items.forEach(x=>{
+    const key=String(x.recurringId)+'|'+x.name;
+    if(!groups.has(key))groups.set(key,{...x,count:0,total:0,firstDate:x.date,lastDate:x.date,allActual:true});
+    const g=groups.get(key);g.count++;g.total+=x.amount;g.firstDate=g.firstDate<x.date?g.firstDate:x.date;g.lastDate=g.lastDate>x.date?g.lastDate:x.date;g.allActual=g.allActual&&!!x.actual;
+  });
+  return [...groups.values()].sort((a,b)=>a.name.localeCompare(b.name));
+}
+
+// Idempotently create one real expenses row per due date. The database unique index
+// on (recurring_id, recurring_occurrence_date) prevents duplicates across reloads/ranges.
+async function syncRecurringExpenses(){
+  if(!user)return;
+  const today=todayStr(),rows=[];
+  const fallbackCategory=(cats.find(c=>c.id==='other')||cats[0]||{id:'other'}).id;
+  recs.forEach(r=>{
+    const stop=r.endedOn&&r.endedOn<today?r.endedOn:today;
+    recurringDueDates(r,r.startedOn||today,stop).forEach(date=>{
+      rows.push({
+        user_id:user.id,name:r.name,amount:r.amount,cat_id:fallbackCategory,date,
+        recurring_id:r.id,recurring_occurrence_date:date
+      });
+    });
+  });
+  if(rows.length){
+    const{error}=await sb.from('expenses').upsert(rows,{onConflict:'recurring_id,recurring_occurrence_date',ignoreDuplicates:true});
+    if(error)throw error;
+  }
+  const{data,error}=await sb.from('expenses').select('*').eq('user_id',user.id).not('recurring_id','is',null);
+  if(error)throw error;
+  const actual=(data||[]).map(r=>({id:r.id,name:r.name,amount:+r.amount,catId:r.cat_id,date:r.date,recurringId:r.recurring_id,recurringOccurrenceDate:r.recurring_occurrence_date}));
+  exps=exps.filter(e=>!e.recurringId).concat(actual);
+}
+
+async function checkRecurringDateBoundary(){
+  if(!user)return;
+  const today=todayStr();
+  if(_lastRecurringSyncDate===today)return;
+  try{
+    await syncRecurringExpenses();
+    renderMoney();renderPlan();
+  }catch(e){toast('Could not finalize recurring expenses: '+e.message);}
+  finally{_lastRecurringSyncDate=today;}
 }
 
 // ═══ MONEY ═══
@@ -773,21 +877,27 @@ function renderMoney(){
   document.getElementById('mn-next').style.opacity=moneyOffset>=0?'0.3':'1';
   document.getElementById('mn-next').style.pointerEvents=moneyOffset>=0?'none':'auto';
   const paysP=pays.filter(p=>p.date>=range.start&&p.date<=range.end).sort((a,b)=>b.date.localeCompare(a.date));
-  const expsP=exps.filter(e=>e.date>=range.start&&e.date<=range.end).sort((a,b)=>b.date.localeCompare(a.date));
+  const expsP=exps.filter(e=>!e.recurringId&&expenseDate(e)>=range.start&&expenseDate(e)<=range.end).sort((a,b)=>expenseDate(b).localeCompare(expenseDate(a)));
+  const regularP=regularOccurrencesForPeriod(range.start,range.end);
+  const regularGroups=regularDisplayGroups(regularP,moneyPeriod==='year');
   document.getElementById('pays-list').innerHTML=paysP.length?paysP.map(p=>'<div class="litem"><div class="lico">\uD83D\uDCB5</div><div class="linf"><div class="lname">'+(p.note||'Payment received')+'</div><div class="lsub">'+fmtD(p.date)+'</div></div><div class="lact"><span class="lamt" style="color:var(--gn);">+'+fmtMoney(p.amount)+'</span><button class="btn bs bsm" onclick="openConfirm(\'Remove?\',()=>delPay(\''+p.id+'\'))">&#10005;</button></div></div>').join(''):'<div class="empty" style="padding:12px 0 2px;"><p>No payments in this period</p></div>';
   const catMap=Object.fromEntries(cats.map(c=>[c.id,c]));
-  document.getElementById('exps-list').innerHTML=expsP.length?expsP.map(e=>{const c=catMap[e.catId]||{emoji:'\uD83D\uDCE6',name:'Other'};return'<div class="litem"><div class="lico">'+c.emoji+'</div><div class="linf"><div class="lname">'+e.name+'</div><div class="lsub">'+c.name+' \u00B7 '+fmtD(e.date)+'</div></div><div class="lact"><span class="lamt">'+fmtMoney(e.amount)+'</span><button class="btn bs bsm" onclick="openConfirm(\'Delete?\',()=>delExp(\''+e.id+'\'))">&#10005;</button></div></div>';}).join(''):'<div class="empty" style="padding:12px 0 2px;"><p>No expenses in this period</p></div>';
+  document.getElementById('exps-list').innerHTML=expsP.length?expsP.map(e=>{const c=catMap[e.catId]||{emoji:'\uD83D\uDCE6',name:'Other'},dt=expenseDate(e);return'<div class="litem"><div class="lico">'+c.emoji+'</div><div class="linf"><div class="lname">'+e.name+'</div><div class="lsub">'+c.name+' \u00B7 '+fmtD(dt)+'</div></div><div class="lact"><span class="lamt">'+fmtMoney(e.amount)+'</span><button class="btn bs bsm" onclick="openConfirm(\'Delete?\',()=>delExp(\''+e.id+'\'))">&#10005;</button></div></div>';}).join(''):'<div class="empty" style="padding:12px 0 2px;"><p>No expenses in this period</p></div>';
+  const activeRecs=recs.filter(r=>!r.endedOn);
   const rEl=document.getElementById('recs-list'),rtEl=document.getElementById('rec-tot');
-  if(!recs.length){rEl.innerHTML='<div class="empty" style="padding:12px 0 2px;"><p>No recurring payments</p></div>';}
+  if(!activeRecs.length){rEl.innerHTML='<div class="empty" style="padding:12px 0 2px;"><p>No active recurring rules</p></div>';}
   else{
-    const tot=recs.reduce((s,r)=>s+r.amount,0);
-    rEl.innerHTML=recs.map(r=>'<div class="litem"><div class="lico">\uD83D\uDD01</div><div class="linf"><div class="lname">'+r.name+'</div><div class="lsub">Every month, day '+r.day+'</div></div><div class="lact"><span class="lamt">'+fmtMoney(r.amount)+'/mo</span><button class="btn bs bsm" onclick="openConfirm(\'Remove '+r.name+'?\',()=>delRec(\''+r.id+'\'))">&#10005;</button></div></div>').join('');
+    rEl.innerHTML=activeRecs.map(r=>'<div class="litem"><div class="lico">\uD83D\uDD01</div><div class="linf"><div class="lname">'+r.name+'</div><div class="lsub">Every month, day '+r.day+'</div></div><div class="lact"><span class="lamt">'+fmtMoney(r.amount)+'/mo</span><button class="btn bs bsm" onclick="openConfirm(\'Remove '+r.name+'?\',()=>delRec(\''+r.id+'\'))">&#10005;</button></div></div>').join('');
   }
-  const due=recurringOccurrences(range.start,range.end),dueTotal=due.reduce((sum,r)=>sum+r.amount,0);
-  const dueLabel=moneyPeriod==='week'?'Due this week':moneyPeriod==='month'?'Due this month':'Due this year';
-  rtEl.innerHTML=(recs.length?'<hr><div class="mrow"><span class="mlbl">Monthly total</span><span class="mval" style="color:var(--r4);">'+fmtMoney(recs.reduce((sum,r)=>sum+r.amount,0))+'/mo</span></div>':'')+
-    '<div class="mrow"><span class="mlbl">'+dueLabel+'</span><span class="mval" style="color:var(--rd);">-'+fmtMoney(dueTotal)+'</span></div>'+
-    (due.length?due.map(r=>'<div class="snote">'+fmtD(r.date)+' · '+r.name+': '+fmtMoney(r.amount)+'</div>').join(''):'<div class="snote">No recurring payments due in this period.</div>');
+  const regularTotal=regularP.reduce((sum,r)=>sum+r.amount,0);
+  const regularLabel=moneyPeriod==='week'?'Regular expenses this week':moneyPeriod==='month'?'Regular expenses this month':'Regular expenses this year';
+  const regularDetail=regularGroups.length?regularGroups.map(r=>{
+    const dateLabel=moneyPeriod==='year'?(r.count>1?fmtD(r.firstDate)+' – '+fmtD(r.lastDate):fmtD(r.date)):(fmtD(r.date)+(r.actual?'':' · Upcoming'));
+    const countLabel=moneyPeriod==='year'&&r.count>1?' ('+r.count+' times)':'';
+    return '<div class="litem"><div class="lico">\uD83D\uDD01</div><div class="linf"><div class="lname">'+r.name+countLabel+'</div><div class="lsub"><strong>Regular Expense</strong> · '+dateLabel+'</div></div><div class="lact"><span class="lamt">'+fmtMoney(moneyPeriod==='year'?r.total:r.amount)+'</span></div></div>';
+  }).join(''):'<div class="empty" style="padding:12px 0 2px;"><p>No regular expenses in this period</p></div>';
+  rtEl.innerHTML=(activeRecs.length?'<hr><div class="mrow"><span class="mlbl">Current rules total (reference)</span><span class="mval" style="color:var(--r4);">'+fmtMoney(activeRecs.reduce((sum,r)=>sum+r.amount,0))+'/mo</span></div>':'')+
+    '<div class="mrow"><span class="mlbl">'+regularLabel+'</span><span class="mval" style="color:var(--rd);">-'+fmtMoney(regularTotal)+'</span></div>'+regularDetail;
 }
 
 // ═══ PLAN ═══
@@ -804,43 +914,84 @@ function goalForecast(g){
   const elapsedWeeks=elapsedDays/7;
   const average=Math.max(0,g.saved)/elapsedWeeks;
 
-  // Only completed full weeks after history tracking began are used for median/best-week scenarios.
+  // Only fully completed tracked calendar weeks are used for median and best-week scenarios.
   const historyStart=g.historyStartedOn||today;
   let firstWeek=wkStart(historyStart);
   if(firstWeek<historyStart)firstWeek=addDays(firstWeek,7);
   const lastCompletedWeek=addDays(wkStart(today),-7);
-  const weeklyTotals=[];
+  const weeklyTotals=[],weekStarts=[];
   for(let ws=firstWeek;ws<=lastCompletedWeek;ws=addDays(ws,7)){
     const we=addDays(ws,6);
     const total=goalContributions.filter(c=>c.goalId===g.id&&!c.openingBalance&&c.date>=ws&&c.date<=we).reduce((sum,c)=>sum+c.amount,0);
-    weeklyTotals.push(total);
+    weeklyTotals.push(total);weekStarts.push(ws);
   }
   const pessimistic=weeklyTotals.length?median(weeklyTotals):0;
   const sortedWeeks=[...weeklyTotals].sort((a,b)=>a-b),mid=Math.floor(sortedWeeks.length/2);
   const medianValues=weeklyTotals.length?(sortedWeeks.length%2?[sortedWeeks[mid]]:[sortedWeeks[mid-1],sortedWeeks[mid]]):[];
   const bestWeeks=[...weeklyTotals].sort((a,b)=>b-a).slice(0,3);
   const optimistic=bestWeeks.length?bestWeeks.reduce((sum,n)=>sum+n,0)/bestWeeks.length:0;
-  return{average,elapsedWeeks,pessimistic,optimistic,weeklyCount:weeklyTotals.length,bestCount:bestWeeks.length,medianValues,bestWeeks};
+  const shiftsSinceStart=shts.filter(s=>s.date>=start&&s.date<=today).length;
+  const shiftWeeks=Math.max(1,elapsedWeeks);
+  const shiftsPerWeek=shiftsSinceStart/shiftWeeks;
+  return{average,elapsedWeeks,pessimistic,optimistic,weeklyCount:weeklyTotals.length,bestCount:bestWeeks.length,medianValues,bestWeeks,shiftsSinceStart,shiftWeeks,shiftsPerWeek,weekStarts};
 }
-function forecastText(label,rate,remaining,detail){
-  if(remaining<=0)return'<div class="gforecast-row"><strong>'+label+':</strong> Goal reached</div>';
-  if(!(rate>0))return'<div class="gforecast-row"><strong>'+label+':</strong> Not enough positive weekly savings yet</div>';
+function forecastShiftDetail(remaining,rate,forecast){
+  if(!(rate>0)||remaining<=0)return'';
   const weeks=Math.ceil(remaining/rate);
-  return'<div class="gforecast-row"><strong>'+label+':</strong> '+fmtMoney(rate)+'/week → about '+weeks+' week'+(weeks===1?'':'s')+'</div>'+(detail?'<div class="gforecast-note">'+detail+'</div>':'');
+  if(!(forecast&&forecast.shiftsPerWeek>0))return' Shift count unavailable: no shifts logged since this goal started, so the estimate is shown in weeks.';
+  return' Shift estimate: '+forecast.shiftsSinceStart+' logged shifts ÷ '+forecast.shiftWeeks.toFixed(1)+' weeks = '+forecast.shiftsPerWeek.toFixed(2)+' shifts/week; '+weeks+' weeks × '+forecast.shiftsPerWeek.toFixed(2)+' ≈ '+Math.ceil(weeks*forecast.shiftsPerWeek)+' shifts.';
+}
+function toggleForecastDetail(id,btn){
+  const el=document.getElementById(id);if(!el)return;
+  const opening=el.hidden;el.hidden=!opening;
+  if(btn)btn.setAttribute('aria-expanded',String(opening));
+}
+function togglePlanBreakdown(id,btn){
+  const el=document.getElementById(id);if(!el)return;
+  const opening=el.hidden;el.hidden=!opening;
+  if(btn){btn.setAttribute('aria-expanded',String(opening));const arrow=btn.querySelector('.gforecast-arrow');if(arrow)arrow.textContent=opening?'⌃':'⌄';}
+}
+function forecastText(goalId,index,label,rate,remaining,detail,forecast,preliminary){
+  if(remaining<=0)return'<div class="gforecast-row"><strong>'+label+':</strong> Goal reached</div>';
+  const detailId='gfd-'+goalId+'-'+index;
+  let headline;
+  if(!(rate>0))headline='Not enough weekly savings';
+  else{
+    const weeks=Math.ceil(remaining/rate);
+    const shifts=forecast&&forecast.shiftsPerWeek>0?Math.ceil(weeks*forecast.shiftsPerWeek):0;
+    headline=shifts>0?'≈'+shifts+' shifts left if putting '+fmtMoney(rate)+' weekly':weeks+' weeks left if putting '+fmtMoney(rate)+' weekly';
+  }
+  return'<div class="gforecast-row"><button type="button" class="gforecast-toggle" aria-expanded="false" aria-controls="'+detailId+'" onclick="toggleForecastDetail(\''+detailId+'\',this)"><span><strong>'+label+':</strong> '+headline+(preliminary?'<span class="gforecast-status">Preliminary</span>':'')+'</span><span class="gforecast-arrow">⌄</span></button><div class="gforecast-note" id="'+detailId+'" hidden>'+(detail||'')+'</div></div>';
 }
 function renderPlan(){
   const goalsHtml=gols.length?gols.map(g=>{
     const rem=Math.max(0,g.target-g.saved),pct=Math.min(100,g.target>0?g.saved/g.target*100:0),f=goalForecast(g);
     const rows=[];
     if(!goalHistoryReady){
-      rows.push('<div class="gforecast-row"><strong>Forecasts:</strong> Apply goal_forecast_migration.sql to enable dated savings history.</div>');
+      rows.push('<div class="gforecast-row">Run goal_forecast_migration.sql to enable dated savings history.</div>');
     }else{
-      if(cfg.weeklySavingsTarget>0)rows.push(forecastText('Custom target',cfg.weeklySavingsTarget,rem,'Based on the custom target set in Settings.'));
-      rows.push(forecastText('Pessimistic · median',f.pessimistic,rem,f.weeklyCount?('Median of '+f.weeklyCount+' completed tracked weeks since '+fmtD(g.historyStartedOn||todayStr())+', including zero weeks. Middle value'+(f.medianValues.length===1?'':'s')+': '+f.medianValues.map(fmtMoney).join(' and ')+'.'):'No complete tracked weeks yet; this estimate will appear after the first full week.'));
-      rows.push(forecastText('Average',f.average,rem,fmtMoney(g.saved)+' saved ÷ '+f.elapsedWeeks.toFixed(1)+' elapsed weeks = '+fmtMoney(f.average)+'/week, since '+fmtD(g.startedOn||g.historyStartedOn||todayStr())+'.'));
-      rows.push(forecastText('Optimistic · best weeks',f.optimistic,rem,f.bestCount?'Best '+f.bestCount+' of '+f.weeklyCount+' completed tracked weeks: '+f.bestWeeks.map(fmtMoney).join(' + ')+' ÷ '+f.bestCount+' = '+fmtMoney(f.optimistic)+'/week.':'No complete tracked weeks yet; this estimate will appear after the first full week.'));
+      if(cfg.weeklySavingsTarget>0){
+        const weeks=rem>0?Math.ceil(rem/cfg.weeklySavingsTarget):0;
+        const customDetail='Custom weekly target from Settings: '+fmtMoney(cfg.weeklySavingsTarget)+'/week. '+fmtMoney(rem)+' remaining ÷ '+fmtMoney(cfg.weeklySavingsTarget)+'/week = '+weeks+' weeks.'+forecastShiftDetail(rem,cfg.weeklySavingsTarget,f);
+        rows.push(forecastText(g.id,0,'Custom target',cfg.weeklySavingsTarget,rem,customDetail,f,false));
+      }
+      if(f.weeklyCount===0){
+        rows.push('<div class="gforecast-row">Not enough weeks to calculate weekly-history forecasts.</div>');
+      }else{
+        const preliminary=f.weeklyCount<4;
+        if(f.weeklyCount>=2){
+          const medDetail='Median of '+f.weeklyCount+' completed tracked weeks since '+fmtD(g.historyStartedOn||todayStr())+', including zero weeks. Middle value'+(f.medianValues.length===1?'':'s')+': '+f.medianValues.map(fmtMoney).join(' and ')+'.'+(preliminary?' Preliminary result: fewer than 4 completed weeks are available.':'')+forecastShiftDetail(rem,f.pessimistic,f);
+          rows.push(forecastText(g.id,1,'Pessimistic · median',f.pessimistic,rem,medDetail,f,preliminary));
+        }
+        const avgDetail=fmtMoney(g.saved)+' saved ÷ '+f.elapsedWeeks.toFixed(1)+' elapsed weeks = '+fmtMoney(f.average)+'/week, since '+fmtD(g.startedOn||g.historyStartedOn||todayStr())+'.'+forecastShiftDetail(rem,f.average,f);
+        rows.push(forecastText(g.id,2,'Average',f.average,rem,avgDetail,f,preliminary&&f.weeklyCount>=2));
+        if(f.weeklyCount>=2){
+          const bestDetail='Average of the '+f.bestCount+' highest completed weeks out of '+f.weeklyCount+': '+f.bestWeeks.map(fmtMoney).join(' + ')+' ÷ '+f.bestCount+' = '+fmtMoney(f.optimistic)+'/week.'+(preliminary?' Preliminary result: fewer than 4 completed weeks are available.':'')+forecastShiftDetail(rem,f.optimistic,f);
+          rows.push(forecastText(g.id,3,'Optimistic · best weeks',f.optimistic,rem,bestDetail,f,preliminary));
+        }
+      }
     }
-    return'<div class="goalcard"><div class="gname">'+g.name+'</div><div class="gtgt">'+fmtMoney(g.target)+'</div><div class="gsub">'+fmtMoney(g.saved)+' saved · '+fmtMoney(rem)+' to go</div><div class="pbar"><div class="pfill" style="width:'+pct+'%"></div></div><div class="gforecast">'+rows.join('')+'</div><div class="gfoot"><span class="gshifts">'+(rem<=0?'Completed':'Forecasts are estimates')+'</span><div style="display:flex;gap:6px;"><button class="btn bs bsm" onclick="openAddSav(\''+g.id+'\')">+ Add</button><button class="btn bs bsm" style="color:var(--rd);background:var(--rdb);" onclick="openConfirm(\'Delete goal?\',()=>delGoal(\''+g.id+'\'))">&#10005;</button></div></div></div>';
+    return'<div class="goalcard"><div class="gname">'+g.name+'</div><div class="gtgt">'+fmtMoney(g.target)+'</div><div class="gsub">'+fmtMoney(g.saved)+' saved · '+fmtMoney(rem)+' to go</div><div class="pbar"><div class="pfill" style="width:'+pct+'%"></div></div><div class="gforecast">'+rows.join('')+'</div><div class="gfoot">'+(rem<=0?'<span class="gshifts">Completed</span>':'<span></span>')+'<div style="display:flex;gap:6px;"><button class="btn bs bsm" onclick="openAddSav(\''+g.id+'\')">+ Add</button><button class="btn bs bsm" style="color:var(--rd);background:var(--rdb);" onclick="openConfirm(\'Delete goal?\',()=>delGoal(\''+g.id+'\'))">&#10005;</button></div></div></div>';
   }).join(''):'<div class="empty" style="padding:4px 0 12px;"><p>Add a goal to start tracking</p></div>';
   document.getElementById('goals-list').innerHTML=goalsHtml;
 
@@ -849,23 +1000,29 @@ function renderPlan(){
   document.getElementById('pn-next').style.opacity=planOffset>=0?'0.3':'1';
   document.getElementById('pn-next').style.pointerEvents=planOffset>=0?'none':'auto';
   const pShifts=shts.filter(s=>s.date>=range.start&&s.date<=range.end);
-  const pExps=exps.filter(e=>e.date>=range.start&&e.date<=range.end);
-  const pRecurring=recurringOccurrences(range.start,range.end);
+  const pExps=exps.filter(e=>!e.recurringId&&expenseDate(e)>=range.start&&expenseDate(e)<=range.end);
+  const pRecurring=regularOccurrencesForPeriod(range.start,range.end);
+  const pRecurringGroups=regularDisplayGroups(pRecurring,planPeriod==='year');
+  const pContributions=goalContributions.filter(c=>!c.openingBalance&&c.date>=range.start&&c.date<=range.end);
   const oEl=document.getElementById('plan-ov');
-  if(!pShifts.length&&!pExps.length&&!pRecurring.length){oEl.innerHTML='<p style="font-size:.8rem;color:var(--mt);font-weight:500;">No data for this period yet.</p>';return;}
+  if(!pShifts.length&&!pExps.length&&!pRecurring.length&&!pContributions.length){oEl.innerHTML='<p style="font-size:.8rem;color:var(--mt);font-weight:500;">No data for this period yet.</p>';return;}
   const wMap={};pShifts.forEach(s=>{const ws=getPayPeriodStart(s.date);(wMap[ws]=wMap[ws]||[]).push(s);});
   const pEarned=Object.values(wMap).reduce((sum,ws)=>sum+calcWk(ws).earned,0);
-  const pExpTotal=pExps.reduce((s,e)=>s+e.amount,0),recTotal=pRecurring.reduce((s,r)=>s+r.amount,0),taxSet=(cfg.taxRate||0)>0;
+  const pExpTotal=pExps.reduce((s,e)=>s+e.amount,0),recTotal=pRecurring.reduce((s,r)=>s+r.amount,0),saveUpTotal=pContributions.reduce((sum,c)=>sum+c.amount,0),taxSet=(cfg.taxRate||0)>0;
   const netAfter=pEarned-pExpTotal-recTotal;
+  const estTakeHome=Math.max(0,netOf(pEarned)-pExpTotal-recTotal);
+  const availableBeforeSavings=taxSet?estTakeHome:netAfter;
+  const leftAfterSavings=availableBeforeSavings-saveUpTotal;
   const catMap=Object.fromEntries(cats.map(c=>[c.id,c]));
-  const expDetail=pExps.length?pExps.map(e=>{const c=catMap[e.catId]||{emoji:'\uD83D\uDCE6'};return c.emoji+' '+e.name+': '+fmtMoney(e.amount);}).join(' · '):'';
-  const recDetail=pRecurring.map(r=>fmtD(r.date)+' · '+r.name+': '+fmtMoney(r.amount)).join(' · ');
-  const netNeeded=pExpTotal>0||recTotal>0;
-  oEl.innerHTML='<div class="mrow"><span class="mlbl">Earned</span><span class="mval" style="color:var(--gn);">+'+fmtMoney(pEarned)+'</span></div>'+
-    (pExpTotal>0?'<div class="mrow"><span class="mlbl">Regular expenses ('+pExps.length+')</span><span class="mval" style="color:var(--rd);">-'+fmtMoney(pExpTotal)+'</span></div>'+(expDetail?'<div class="snote">'+expDetail+'</div>':''):'')+
-    (recTotal>0?'<div class="mrow"><span class="mlbl">Recurring payments ('+pRecurring.length+')</span><span class="mval" style="color:var(--rd);">-'+fmtMoney(recTotal)+'</span></div><div class="snote">'+recDetail+'</div>':'')+
-    (netNeeded?'<div class="mrow" style="border-top:1px solid var(--bd);margin-top:4px;padding-top:10px;"><span style="font-weight:700;font-size:.87rem;">Net</span><span style="font-weight:800;font-size:1.05rem;color:'+(netAfter>=0?'var(--gn)':'var(--rd)')+';">'+fmtMoney(netAfter)+'</span></div>':'')+
-    (taxSet?'<div class="mrow"><span style="font-weight:700;font-size:.87rem;">Est. take-home</span><span style="font-weight:800;font-size:1.05rem;color:var(--gn);">'+fmtMoney(Math.max(0,netOf(pEarned)-pExpTotal-recTotal))+'</span></div>':'');
+  const expDetail=pExps.map(e=>{const c=catMap[e.catId]||{emoji:'📦',name:'Other'},dt=expenseDate(e);return'<div class="plan-line"><span class="plan-line-main">'+c.emoji+' '+e.name+'<span class="plan-line-sub">'+c.name+' · '+fmtD(dt)+'</span></span><span class="plan-line-amt">-'+fmtMoney(e.amount)+'</span></div>';}).join('');
+  const recDetail=pRecurringGroups.map(r=>{const dateLabel=planPeriod==='year'?(r.count>1?fmtD(r.firstDate)+' – '+fmtD(r.lastDate):fmtD(r.date)):(fmtD(r.date)+(r.actual?'':' · Upcoming'));const countLabel=planPeriod==='year'&&r.count>1?' ('+r.count+' times)':'';return'<div class="plan-line"><span class="plan-line-main">'+r.name+countLabel+'<span class="plan-line-sub">Regular Expense · '+dateLabel+'</span></span><span class="plan-line-amt">-'+fmtMoney(planPeriod==='year'?r.total:r.amount)+'</span></div>';}).join('');
+  const hasGoals=gols.length>0||pContributions.length>0;
+  oEl.innerHTML=(pShifts.length||pEarned>0?'<div class="mrow"><span class="mlbl">Earned</span><span class="mval" style="color:var(--gn);">+'+fmtMoney(pEarned)+'</span></div>':'')+
+    (pExpTotal>0?'<button type="button" class="mrow mrow-disclosure" aria-expanded="false" aria-controls="plan-exp-detail" onclick="togglePlanBreakdown(\'plan-exp-detail\',this)"><span class="mlbl">Expenses ('+pExps.length+')</span><span class="mval" style="color:var(--rd);">-'+fmtMoney(pExpTotal)+'</span><span class="gforecast-arrow">⌄</span></button><div class="plan-breakdown" id="plan-exp-detail" hidden>'+expDetail+'</div>':'')+
+    (recTotal>0?'<button type="button" class="mrow mrow-disclosure" aria-expanded="false" aria-controls="plan-rec-detail" onclick="togglePlanBreakdown(\'plan-rec-detail\',this)"><span class="mlbl">Recurring ('+pRecurring.length+')</span><span class="mval" style="color:var(--rd);">-'+fmtMoney(recTotal)+'</span><span class="gforecast-arrow">⌄</span></button><div class="plan-breakdown" id="plan-rec-detail" hidden>'+recDetail+'</div>':'')+
+    ((pExpTotal>0||recTotal>0||pEarned>0)?'<div class="mrow" style="border-top:1px solid var(--bd);margin-top:4px;padding-top:10px;"><span style="font-weight:700;font-size:.87rem;">Net</span><span style="font-weight:800;font-size:1.05rem;color:'+(netAfter>=0?'var(--gn)':'var(--rd)')+';">'+fmtMoney(netAfter)+'</span></div>':'')+
+    (taxSet?'<div class="mrow"><span style="font-weight:700;font-size:.87rem;">Est. take-home</span><span style="font-weight:800;font-size:1.05rem;color:var(--gn);">'+fmtMoney(estTakeHome)+'</span></div>':'')+
+    (hasGoals?'<div class="mrow"><span style="font-weight:700;font-size:.87rem;">Save Up</span><span class="mval" style="color:var(--gn);">-'+fmtMoney(saveUpTotal)+'</span></div><div class="mrow"><span style="font-weight:800;font-size:.9rem;">Left</span><span style="font-weight:800;font-size:1.05rem;color:'+(leftAfterSavings>=0?'var(--gn)':'var(--rd)')+';">'+fmtMoney(leftAfterSavings)+'</span></div>':'');
 }
 
 // ═══ SETTINGS ═══
@@ -929,7 +1086,7 @@ async function saveExp(){
   const nm=document.getElementById('se-nm').value.trim(),am=parseFloat(document.getElementById('se-am').value),cat=document.getElementById('se-cat').value,dt=document.getElementById('se-dt').value;
   if(!nm||isNaN(am)||am<=0){toast('Enter name and amount');return;}
   setBusy('se-save',true,'Add');
-  try{const row=await dbIns('expenses',{name:nm,amount:am,cat_id:cat,date:dt});exps.push({id:row.id,name:nm,amount:am,catId:cat,date:dt});cl('sh-exp');toast('Expense added \u2713');renderMoney();}
+  try{const row=await dbIns('expenses',{name:nm,amount:am,cat_id:cat,date:dt});exps.push({id:row.id,name:nm,amount:am,catId:cat,date:dt,recurringId:null,recurringOccurrenceDate:null});cl('sh-exp');toast('Expense added \u2713');renderMoney();}
   catch(e){toast('Error: '+e.message);}finally{setBusy('se-save',false,'Add');}
 }
 async function delExp(id){try{await dbDel('expenses',id);exps=exps.filter(e=>e.id!==id);renderMoney();}catch(e){toast('Error: '+e.message);}}
@@ -949,11 +1106,26 @@ async function saveRec(){
   const nm=document.getElementById('sr-nm').value.trim(),am=parseFloat(document.getElementById('sr-am').value),dy=parseInt(document.getElementById('sr-dy').value)||1;
   if(!nm||isNaN(am)||am<=0){toast('Enter name and amount');return;}
   setBusy('sr-save',true,'Add');
-  try{const row=await dbIns('recurring',{name:nm,amount:am,day_of_month:dy});recs.push({id:row.id,name:nm,amount:am,day:dy});cl('sh-rec');toast('Added \u2713');renderMoney();}
-  catch(e){toast('Error: '+e.message);}finally{setBusy('sr-save',false,'Add');}
+  try{
+    const startedOn=todayStr();
+    const row=await dbIns('recurring',{name:nm,amount:am,day_of_month:dy,started_on:startedOn});
+    recs.push({id:row.id,name:nm,amount:am,day:dy,startedOn:row.started_on||startedOn,endedOn:null});
+    try{await syncRecurringExpenses();_lastRecurringSyncDate=todayStr();}catch(syncErr){toast('Rule saved, but expense history needs the SQL migration: '+syncErr.message);}
+    cl('sh-rec');toast('Added \u2713');renderMoney();renderPlan();
+  }catch(e){toast('Error: '+e.message);}finally{setBusy('sr-save',false,'Add');}
 }
-async function delRec(id){try{await dbDel('recurring',id);recs=recs.filter(r=>r.id!==id);renderMoney();}catch(e){toast('Error: '+e.message);}}
-
+async function delRec(id){
+  const rule=recs.find(r=>r.id===id);if(!rule||rule.endedOn)return;
+  try{
+    // Finalize anything due through today before archiving the rule.
+    await syncRecurringExpenses();
+    const endedOn=todayStr();
+    await dbUpd('recurring',id,{ended_on:endedOn});
+    rule.endedOn=endedOn;
+    _lastRecurringSyncDate=endedOn;
+    renderMoney();renderPlan();toast('Removed from future; past expenses kept ✓');
+  }catch(e){toast('Error: '+e.message);}
+}
 function openGoalSh(){['sg-nm','sg-tg','sg-sv'].forEach(x=>document.getElementById(x).value='');setBusy('sg-save',false,'Add');op('sh-goal');}
 async function saveGoal(){
   if(!goalHistoryReady){toast('Run goal_forecast_migration.sql in Supabase first');return;}
@@ -974,18 +1146,22 @@ async function saveGoal(){
   }
   catch(e){toast('Error: '+e.message);}finally{setBusy('sg-save',false,'Add');}
 }
-function openAddSav(id){_gid=id;document.getElementById('sas-am').value='';op('sh-addsav');}
+function openAddSav(id){_gid=id;document.getElementById('sas-am').value='';document.getElementById('sas-date').value=todayStr();document.getElementById('sas-date').max=todayStr();op('sh-addsav');}
 async function doAddSav(){
   if(!goalHistoryReady){toast('Run goal_forecast_migration.sql in Supabase first');return;}
-  const am=parseFloat(document.getElementById('sas-am').value);if(isNaN(am)||am<=0){toast('Enter an amount');return;}
+  const am=parseFloat(document.getElementById('sas-am').value),dt=document.getElementById('sas-date').value;
+  if(isNaN(am)||am<=0){toast('Enter an amount');return;}
+  if(!dt||dt>todayStr()){toast('Choose a valid date (today or earlier)');return;}
   const g=gols.find(x=>x.id===_gid);if(!g)return;const added=Math.min(am,Math.max(0,g.target-g.saved)),nv=g.saved+added;
   if(added<=0){toast('This goal is already complete');return;}
+  const startedOn=dt<(g.startedOn||dt)?dt:(g.startedOn||dt);
+  const historyStartedOn=dt<(g.historyStartedOn||startedOn)?dt:(g.historyStartedOn||startedOn);
   let contribution=null;
   try{
-    contribution=await dbIns('goal_contributions',{goal_id:_gid,amount:added,contribution_date:todayStr(),is_opening_balance:false});
-    try{await dbUpd('goals',_gid,{saved:nv});}
+    contribution=await dbIns('goal_contributions',{goal_id:_gid,amount:added,contribution_date:dt,is_opening_balance:false});
+    try{await dbUpd('goals',_gid,{saved:nv,started_on:startedOn,history_started_on:historyStartedOn});}
     catch(err){await dbDel('goal_contributions',contribution.id);throw err;}
-    g.saved=nv;goalContributions.push({id:contribution.id,goalId:_gid,amount:added,date:contribution.contribution_date||todayStr(),openingBalance:false,createdAt:contribution.created_at});
+    g.saved=nv;g.startedOn=startedOn;g.historyStartedOn=historyStartedOn;goalContributions.push({id:contribution.id,goalId:_gid,amount:added,date:contribution.contribution_date||dt,openingBalance:false,createdAt:contribution.created_at});
     cl('sh-addsav');toast('Savings updated ✓');renderPlan();
   }catch(e){toast('Error: '+e.message);}
 }
