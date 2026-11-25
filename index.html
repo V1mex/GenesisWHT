@@ -88,6 +88,7 @@ input:focus,select:focus{border-color:var(--r4);background:#fff;}
 .osub{margin-top:10px;display:grid;gap:2px;}
 .owe-main-tap{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;border:0;background:transparent;color:#fff;text-align:left;cursor:pointer;font-family:inherit;}
 .owe-main-tap .oamt{flex:1;}
+.owe-arrow{font-size:1rem;font-weight:800;line-height:1;color:rgba(255,255,255,.9);}
 .o-est{font-size:.76rem;font-weight:600;color:rgba(255,255,255,.86);margin-top:6px;}
 .owe-detail{font-size:.7rem;line-height:1.5;color:rgba(255,255,255,.84);padding:7px 0 2px;border-top:1px solid rgba(255,255,255,.2);margin-top:9px;}
 .owe-detail[hidden]{display:none;}
@@ -136,6 +137,15 @@ input:focus,select:focus{border-color:var(--r4);background:#fff;}
 .empty{text-align:center;padding:20px 16px;color:var(--mt);}
 .empty p{font-size:.8rem;font-weight:500;}
 .snote{font-size:.72rem;color:var(--mt);font-weight:500;padding:4px 0 2px;line-height:1.5;}
+.auto-break-prompt{background:var(--amb);border:1px solid #F3D69A;border-radius:13px;padding:13px;margin:0 0 14px;}
+.auto-break-question{font-size:.86rem;font-weight:800;color:#8A5A0A;line-height:1.35;}
+.auto-break-sub{font-size:.7rem;color:#9A7437;line-height:1.45;margin-top:4px;}
+.auto-break-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px;}
+.auto-break-actions .btn{font-size:.76rem;padding:10px 8px;}
+.auto-break-yes{background:#F5A623;color:#fff;}
+.auto-break-no{background:#fff;border:1px solid #E7C98D;color:#8A5A0A;}
+.auto-break-actions .btn:disabled{opacity:.55;cursor:default;}
+
 /* NAV — fix disappearing buttons */
 nav{display:none;position:fixed;bottom:0;left:0;right:0;height:calc(var(--nh) + var(--sb));background:#fff;border-top:1px solid var(--bd);padding-bottom:var(--sb);box-shadow:0 -4px 20px rgba(232,105,138,.1);z-index:100;overflow:hidden;}
 nav.show{display:flex;}
@@ -240,10 +250,18 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
         <button class="btn bp" onclick="logShift()">Log shift</button>
       </div>
       <div id="td-auto-form" hidden>
-        <div class="ctitle" id="auto-shift-title">Automatic shift logging</div>
-        <p class="snote" id="auto-shift-status" style="margin:0 0 12px;">Log the start when you begin working.</p>
-        <button class="btn bp" id="auto-start-btn" onclick="startAutoShift()">Log start</button>
-        <button class="btn bp" id="auto-end-btn" onclick="endAutoShift()" hidden>Log end</button>
+        <div class="auto-break-prompt" id="auto-break-prompt" hidden>
+          <div class="auto-break-question" id="auto-break-question">Did you take a break?</div>
+          <div class="auto-break-sub" id="auto-break-sub">Please confirm before saving today's shift.</div>
+          <div class="auto-break-actions">
+            <button type="button" class="btn auto-break-yes" id="auto-break-yes" onclick="resolveAutoBreak(true)">Yes, break taken</button>
+            <button type="button" class="btn auto-break-no" id="auto-break-no" onclick="resolveAutoBreak(false)">No break</button>
+          </div>
+        </div>
+        <div class="ctitle" id="auto-shift-title">Today's shift</div>
+        <p class="snote" id="auto-shift-status" style="margin:0 0 12px;">Ready to start.</p>
+        <button class="btn bp" id="auto-start-btn" onclick="startAutoShift()">Start shift</button>
+        <button class="btn bp" id="auto-end-btn" onclick="endAutoShift()" hidden>End shift</button>
       </div>
     </div>
   </div>
@@ -259,7 +277,7 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
     <div class="obanner">
       <div class="olbl">💰 Employer owes you (gross running total)</div>
       <button type="button" class="owe-main-tap" id="owed-toggle" aria-expanded="false" aria-controls="owed-detail" onclick="toggleInlineDetail('owed-detail',this)">
-        <span class="oamt" id="o-amt">$0.00</span>
+        <span class="oamt" id="o-amt">$0.00</span><span class="owe-arrow" aria-hidden="true">⌄</span>
       </button>
       <div class="o-est" id="o-est" style="display:none;"></div>
       <div class="owe-detail" id="owed-detail" hidden></div>
@@ -492,7 +510,7 @@ let cfg={baseRate:18,otRate:27,otThreshold:40,weekStartDay:4,startingOwed:0,taxR
 const DEF_CATS=[{id:'rent',name:'Rent',emoji:'\uD83C\uDFE0'},{id:'spending',name:'Spending money',emoji:'\uD83D\uDCB3'},{id:'other',name:'Other',emoji:'\uD83D\uDCE6'}];
 let cats=[...DEF_CATS],shts=[],exps=[],recs=[],pays=[],gols=[],goalContributions=[],weekOverrides=[],goalHistoryReady=false;
 let cur='today',planPeriod='week',planOffset=0,moneyPeriod='week',moneyOffset=0;
-let _eid=null,_gid=null,_contributionId=null,_lastRecurringSyncDate='';
+let _eid=null,_gid=null,_contributionId=null,_lastRecurringSyncDate='',pendingAutoShiftEndAt=null;
 
 // ═══ BOOT ═══
 document.addEventListener('DOMContentLoaded',()=>{
@@ -729,13 +747,22 @@ function renderToday(){
   const autoPanel=document.getElementById('td-auto-form');
   autoPanel.hidden=!autoMode;
   if(autoMode){
-    const status=document.getElementById('auto-shift-status'),startBtn=document.getElementById('auto-start-btn'),endBtn=document.getElementById('auto-end-btn');
+    const status=document.getElementById('auto-shift-status'),startBtn=document.getElementById('auto-start-btn'),endBtn=document.getElementById('auto-end-btn'),breakPrompt=document.getElementById('auto-break-prompt');
+    breakPrompt.hidden=true;
     if(activeValid){
-      status.textContent='Shift started '+fmtD(localDateStr(activeStart))+' at '+localTimeStr(activeStart)+'.';
-      startBtn.hidden=true;endBtn.hidden=false;
+      startBtn.hidden=true;endBtn.hidden=false;endBtn.disabled=false;endBtn.textContent='End shift';
+      if(pendingAutoShiftEndAt){
+        const pendingEnd=new Date(pendingAutoShiftEndAt),pendingHours=shHrs(localTimeStr(activeStart),localTimeStr(pendingEnd)),threshold=Number(cfg.breakAutoThresholdHours)||6;
+        status.textContent='One quick check before saving.';
+        document.getElementById('auto-break-question').textContent='Did you take a '+cfg.breakMinutes+'-minute break?';
+        document.getElementById('auto-break-sub').textContent='This shift was '+pendingHours.toFixed(2)+' hours, under the '+threshold+'-hour threshold. Please confirm whether a break should be deducted.';
+        breakPrompt.hidden=false;endBtn.hidden=true;
+      }else{
+        status.textContent='Started '+fmtD(localDateStr(activeStart))+' at '+localTimeStr(activeStart)+'.';
+      }
     }else{
-      status.textContent='Log the start when you begin working.';
-      startBtn.hidden=false;endBtn.hidden=true;
+      status.textContent='Ready when you are.';
+      startBtn.hidden=false;endBtn.hidden=true;startBtn.disabled=false;startBtn.textContent='Start shift';
     }
   }
   if(ex){
@@ -772,6 +799,7 @@ async function setActiveShiftStartedAt(value){
 }
 async function startAutoShift(){
   if(cfg.shiftLoggingMode!=='automatic'){toast('Automatic shift logging is disabled');return;}
+  pendingAutoShiftEndAt=null;document.getElementById('auto-break-prompt').hidden=true;
   if(cfg.activeShiftStartedAt){toast('A shift is already in progress');return;}
   const ds=todayStr();
   if(shts.some(s=>s.date===ds)){toast('A shift is already logged for today. Edit it from Today or History.');return;}
@@ -793,21 +821,42 @@ async function endAutoShift(){
     toast('A shift is already recorded for '+fmtD(ds)+'. Resolve that entry before ending this shift.');return;
   }
   const threshold=Number(cfg.breakAutoThresholdHours)||6;
-  let breakTaken=false;
-  if(hours>=threshold){breakTaken=cfg.breakMinutes>0;}
-  else if(cfg.breakMinutes>0){
-    breakTaken=window.confirm('Did you take a '+cfg.breakMinutes+'-minute break?\n\nOK = Yes, Cancel = No.');
+  if(hours<threshold&&cfg.breakMinutes>0){
+    pendingAutoShiftEndAt=endAt.toISOString();
+    const prompt=document.getElementById('auto-break-prompt');
+    document.getElementById('auto-break-question').textContent='Did you take a '+cfg.breakMinutes+'-minute break?';
+    document.getElementById('auto-break-sub').textContent='This shift was under '+threshold+' hours. Please confirm whether a break should be deducted.';
+    document.getElementById('auto-break-yes').disabled=false;document.getElementById('auto-break-no').disabled=false;
+    document.getElementById('auto-shift-status').textContent='One quick check before saving.';
+    document.getElementById('auto-end-btn').hidden=true;
+    prompt.hidden=false;
+    return;
   }
+  await saveAutoShiftEnd(endAt,hours>=threshold&&cfg.breakMinutes>0);
+}
+async function resolveAutoBreak(breakTaken){
+  if(!pendingAutoShiftEndAt)return;
+  const yes=document.getElementById('auto-break-yes'),no=document.getElementById('auto-break-no');
+  yes.disabled=true;no.disabled=true;
+  await saveAutoShiftEnd(new Date(pendingAutoShiftEndAt),breakTaken);
+}
+async function saveAutoShiftEnd(endAt,breakTaken){
+  const startAt=new Date(cfg.activeShiftStartedAt);
+  const ds=localDateStr(startAt),start=localTimeStr(startAt),end=localTimeStr(endAt),hours=shHrs(start,end);
   const paidHours=breakTaken?Math.max(0,hours-cfg.breakMinutes/60):hours;
-  const btn=document.getElementById('auto-end-btn');btn.disabled=true;
+  const yes=document.getElementById('auto-break-yes'),no=document.getElementById('auto-break-no'),endBtn=document.getElementById('auto-end-btn');
+  if(endBtn)endBtn.disabled=true;
   try{
     const row=await dbIns('shifts',{date:ds,start_time:start,end_time:end,hours,note:'',break_taken:breakTaken,paid_hours:paidHours,base_rate:cfg.baseRate,ot_rate:cfg.otRate,ot_threshold:cfg.otThreshold});
     shts.push({id:row.id,date:ds,start,end,hours,note:'',breakTaken,paidHours,baseRate:cfg.baseRate,otRate:cfg.otRate,otThreshold:cfg.otThreshold});
+    pendingAutoShiftEndAt=null;
     try{await setActiveShiftStartedAt(null);}
     catch(clearErr){cfg.activeShiftStartedAt=null;toast('Shift saved, but the active-session flag could not be cleared. Reload and check Today.');renderToday();return;}
-    toast(breakTaken&&hours>=threshold?'Shift logged · automatic break deducted':'Shift logged');renderToday();
-  }catch(e){toast('Could not log shift end: '+e.message);}
-  finally{btn.disabled=false;}
+    toast(breakTaken?'Shift logged · break deducted':'Shift logged');renderToday();
+  }catch(e){
+    if(yes)yes.disabled=false;if(no)no.disabled=false;if(endBtn)endBtn.disabled=false;
+    toast('Could not log shift end: '+e.message);
+  }
 }
 function editToday(){const s=shts.find(x=>x.date===todayStr());if(s)openEdit(s.id);}
 
@@ -1005,7 +1054,7 @@ function renderMoney(){
     '<div class="owe-summary-help">Gross pay from '+shiftsCount+' logged shifts across '+payPeriods+' pay periods, calculated using each shift’s saved hourly rates and overtime rules.</div>'+
     '<div class="owe-summary-row"><span>Received</span><span class="owe-summary-value">'+fmtMoney(paid)+'</span></div>'+
     '<div class="owe-summary-help">'+fmtMoney(paid)+' is the sum of '+pays.length+' recorded payment'+(pays.length===1?'':'s')+'.</div>';
-  const owedToggle=document.getElementById('owed-toggle');owedToggle.setAttribute('aria-expanded','false');document.getElementById('owed-detail').hidden=true;
+  const owedToggle=document.getElementById('owed-toggle');owedToggle.setAttribute('aria-expanded','false');owedToggle.querySelector('.owe-arrow').textContent='⌄';document.getElementById('owed-detail').hidden=true;
   const range=getPeriodRange(moneyPeriod,moneyOffset);
   document.getElementById('mn-lbl').textContent=range.label;
   document.getElementById('mn-next').style.opacity=moneyOffset>=0?'0.3':'1';
