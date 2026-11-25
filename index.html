@@ -89,14 +89,15 @@ input:focus,select:focus{border-color:var(--r4);background:#fff;}
 .owe-main-tap{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;border:0;background:transparent;color:#fff;text-align:left;cursor:pointer;font-family:inherit;}
 .owe-main-tap .oamt{flex:1;}
 .owe-arrow{font-size:.9rem;opacity:.8;transition:transform .15s;}
-.owe-main-tap[aria-expanded="true"] .owe-arrow,.owe-metric[aria-expanded="true"] .owe-arrow{transform:rotate(180deg);}
-.owe-detail{font-size:.7rem;line-height:1.5;color:rgba(255,255,255,.84);padding:7px 0 9px;border-top:1px solid rgba(255,255,255,.2);margin-top:5px;}
+.owe-main-tap[aria-expanded="true"] .owe-arrow{transform:none;}
+.o-est{font-size:.76rem;font-weight:600;color:rgba(255,255,255,.86);margin-top:6px;}
+.owe-detail{font-size:.7rem;line-height:1.5;color:rgba(255,255,255,.84);padding:7px 0 2px;border-top:1px solid rgba(255,255,255,.2);margin-top:9px;}
 .owe-detail[hidden]{display:none;}
-.owe-metric{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;padding:6px 0;border:0;border-top:1px solid rgba(255,255,255,.16);background:transparent;color:#fff;text-align:left;font:inherit;font-size:.72rem;cursor:pointer;}
-.owe-metric-label{font-weight:600;opacity:.85;}
-.owe-metric-value{font-weight:800;white-space:nowrap;}
-.owe-metric-detail{font-size:.68rem;line-height:1.5;color:rgba(255,255,255,.78);padding:2px 0 8px;}
-.owe-metric-detail[hidden]{display:none;}
+.owe-summary-row{display:flex;align-items:center;gap:7px;padding:5px 0 1px;color:#fff;font-size:.74rem;font-weight:700;}
+.owe-summary-row .owe-summary-value{margin-left:auto;font-weight:800;white-space:nowrap;}
+.owe-summary-caret{font-size:.72rem;opacity:.8;}
+.owe-summary-help{font-size:.66rem;line-height:1.45;color:rgba(255,255,255,.76);padding:0 0 7px;}
+.owe-summary-help:last-child{padding-bottom:2px;}
 .goalcard{background:linear-gradient(135deg,#FFE6EF,#FFCEDD);border-radius:var(--rr);padding:16px;margin-bottom:10px;border:1px solid var(--r2);}
 .gname{font-size:.71rem;font-weight:700;color:var(--r6);letter-spacing:.03em;margin-bottom:2px;}
 .gtgt{font-size:1.7rem;font-weight:800;color:var(--tx);letter-spacing:-.03em;line-height:1.1;}
@@ -251,10 +252,10 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
     <div class="obanner">
       <div class="olbl">💰 Employer owes you (gross running total)</div>
       <button type="button" class="owe-main-tap" id="owed-toggle" aria-expanded="false" aria-controls="owed-detail" onclick="toggleInlineDetail('owed-detail',this)">
-        <span class="oamt" id="o-amt">$0.00</span><span class="owe-arrow">⌄</span>
+        <span class="oamt" id="o-amt">$0.00</span><span class="owe-arrow" aria-hidden="true">⌄</span>
       </button>
+      <div class="o-est" id="o-est" style="display:none;"></div>
       <div class="owe-detail" id="owed-detail" hidden></div>
-      <div class="osub" id="o-sub"></div>
     </div>
     <div class="card">
       <div class="row" style="margin-bottom:10px;">
@@ -906,14 +907,16 @@ function shiftMoneyOff(d){moneyOffset+=d;if(moneyOffset>0)moneyOffset=0;renderMo
 function renderMoney(){
   const o=owed(),earned=allEarned(),paid=totalPaid(),taxSet=(cfg.taxRate||0)>0;
   const shiftsCount=shts.length,payPeriods=new Set(shts.map(s=>getPayPeriodStart(s.date))).size;
-  const owesDetail=(cfg.startingOwed||0)>0?fmtMoney(cfg.startingOwed)+' starting balance + ':' ';
   document.getElementById('o-amt').textContent=fmtMoney(o);
-  document.getElementById('owed-detail').textContent=owesDetail+fmtMoney(earned)+' earned − '+fmtMoney(paid)+' received = '+fmtMoney(o)+' (minimum $0.00).';
+  const estEl=document.getElementById('o-est');
+  estEl.textContent='Est take home  '+fmtMoney(netOf(o));
+  estEl.style.display=taxSet?'block':'none';
+  document.getElementById('owed-detail').innerHTML=
+    '<div class="owe-summary-row"><span>Earned</span><span class="owe-summary-value">'+fmtMoney(earned)+'</span><span class="owe-summary-caret" aria-hidden="true">⌃</span></div>'+
+    '<div class="owe-summary-help">Gross pay from '+shiftsCount+' logged shifts across '+payPeriods+' pay periods, calculated using each shift’s saved hourly rates and overtime rules.</div>'+
+    '<div class="owe-summary-row"><span>Received</span><span class="owe-summary-value">'+fmtMoney(paid)+'</span><span class="owe-summary-caret" aria-hidden="true">⌃</span></div>'+
+    '<div class="owe-summary-help">'+fmtMoney(paid)+' is the sum of '+pays.length+' recorded payment'+(pays.length===1?'':'s')+'.</div>';
   const owedToggle=document.getElementById('owed-toggle');owedToggle.setAttribute('aria-expanded','false');document.getElementById('owed-detail').hidden=true;
-  const metric=(id,label,value,detail)=>'<button type="button" class="owe-metric" aria-expanded="false" aria-controls="'+id+'" onclick="toggleInlineDetail(\''+id+'\',this)"><span class="owe-metric-label">'+label+'</span><span class="owe-metric-value">'+value+'</span><span class="owe-arrow">⌄</span></button><div class="owe-metric-detail" id="'+id+'" hidden>'+detail+'</div>';
-  document.getElementById('o-sub').innerHTML=metric('earned-detail','Earned',fmtMoney(earned),'Gross pay from '+shiftsCount+' logged shifts across '+payPeriods+' pay periods, calculated using each shift’s saved hourly rates and overtime rules.')+
-    metric('received-detail','Received',fmtMoney(paid),fmtMoney(paid)+' is the sum of '+pays.length+' recorded payment'+(pays.length===1?'':'s')+'.')+
-    (taxSet?metric('takehome-money-detail','Est. take-home',fmtMoney(netOf(o)),fmtMoney(o)+' outstanding × (100% − '+cfg.taxRate+'% deductions) = '+fmtMoney(netOf(o))+'.'):'');
   const range=getPeriodRange(moneyPeriod,moneyOffset);
   document.getElementById('mn-lbl').textContent=range.label;
   document.getElementById('mn-next').style.opacity=moneyOffset>=0?'0.3':'1';
