@@ -88,14 +88,11 @@ input:focus,select:focus{border-color:var(--r4);background:#fff;}
 .osub{margin-top:10px;display:grid;gap:2px;}
 .owe-main-tap{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;border:0;background:transparent;color:#fff;text-align:left;cursor:pointer;font-family:inherit;}
 .owe-main-tap .oamt{flex:1;}
-.owe-arrow{font-size:.9rem;opacity:.8;transition:transform .15s;}
-.owe-main-tap[aria-expanded="true"] .owe-arrow{transform:none;}
 .o-est{font-size:.76rem;font-weight:600;color:rgba(255,255,255,.86);margin-top:6px;}
 .owe-detail{font-size:.7rem;line-height:1.5;color:rgba(255,255,255,.84);padding:7px 0 2px;border-top:1px solid rgba(255,255,255,.2);margin-top:9px;}
 .owe-detail[hidden]{display:none;}
 .owe-summary-row{display:flex;align-items:center;gap:7px;padding:5px 0 1px;color:#fff;font-size:.74rem;font-weight:700;}
 .owe-summary-row .owe-summary-value{margin-left:auto;font-weight:800;white-space:nowrap;}
-.owe-summary-caret{font-size:.72rem;opacity:.8;}
 .owe-summary-help{font-size:.66rem;line-height:1.45;color:rgba(255,255,255,.76);padding:0 0 7px;}
 .owe-summary-help:last-child{padding-bottom:2px;}
 .goalcard{background:linear-gradient(135deg,#FFE6EF,#FFCEDD);border-radius:var(--rr);padding:16px;margin-bottom:10px;border:1px solid var(--r2);}
@@ -169,6 +166,8 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
 .tcb:checked{background:var(--r4);}
 .tcb::after{content:'';position:absolute;width:20px;height:20px;background:white;border-radius:50%;top:2px;left:2px;box-shadow:0 1px 3px rgba(0,0,0,.15);transition:left .2s;}
 .tcb:checked::after{left:22px;}
+.setting-disabled{opacity:.42;transition:opacity .15s;}
+.setting-disabled input:disabled{background:#f0e9ec;color:#9B7080;cursor:not-allowed;}
 /* WEEK SHORT TOGGLE — same proportions, slightly smaller */
 .wov-wrap{display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none;}
 .wov{-webkit-appearance:none;appearance:none;width:38px;height:22px;background:var(--bd);border-radius:11px;position:relative;cursor:pointer;flex-shrink:0;transition:background .2s;display:block;}
@@ -229,15 +228,23 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
       <div class="row"><span class="ctitle" style="margin:0;">Today's shift</span><button class="btn bs bsm" onclick="editToday()">Edit</button></div>
       <div id="td-info" style="margin-top:10px;"></div>
     </div>
-    <div class="card" id="td-form">
-      <div class="ctitle">Log today's shift</div>
-      <div class="r2">
-        <div class="fg"><label>Start time</label><input type="time" id="ts" onchange="checkBreakSuggest()"></div>
-        <div class="fg"><label>End time</label><input type="time" id="te" onchange="checkBreakSuggest()"></div>
+    <div class="card" id="td-form" style="display:none;">
+      <div id="td-manual-form">
+        <div class="ctitle">Log today's shift</div>
+        <div class="r2">
+          <div class="fg"><label>Start time</label><input type="time" id="ts" onchange="checkBreakSuggest()"></div>
+          <div class="fg"><label>End time</label><input type="time" id="te" onchange="checkBreakSuggest()"></div>
+        </div>
+        <div class="fg"><label>Note (optional)</label><input type="text" id="tn" placeholder="e.g. extra shift"></div>
+        <div class="trow"><label for="t-break" id="t-break-lbl">30-min break deducted?</label><input type="checkbox" class="tcb" id="t-break"></div>
+        <button class="btn bp" onclick="logShift()">Log shift</button>
       </div>
-      <div class="fg"><label>Note (optional)</label><input type="text" id="tn" placeholder="e.g. extra shift"></div>
-      <div class="trow"><label for="t-break" id="t-break-lbl">30-min break deducted?</label><input type="checkbox" class="tcb" id="t-break"></div>
-      <button class="btn bp" onclick="logShift()">Log shift</button>
+      <div id="td-auto-form" hidden>
+        <div class="ctitle" id="auto-shift-title">Automatic shift logging</div>
+        <p class="snote" id="auto-shift-status" style="margin:0 0 12px;">Log the start when you begin working.</p>
+        <button class="btn bp" id="auto-start-btn" onclick="startAutoShift()">Log start</button>
+        <button class="btn bp" id="auto-end-btn" onclick="endAutoShift()" hidden>Log end</button>
+      </div>
     </div>
   </div>
 
@@ -252,7 +259,7 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
     <div class="obanner">
       <div class="olbl">💰 Employer owes you (gross running total)</div>
       <button type="button" class="owe-main-tap" id="owed-toggle" aria-expanded="false" aria-controls="owed-detail" onclick="toggleInlineDetail('owed-detail',this)">
-        <span class="oamt" id="o-amt">$0.00</span><span class="owe-arrow" aria-hidden="true">⌄</span>
+        <span class="oamt" id="o-amt">$0.00</span>
       </button>
       <div class="o-est" id="o-est" style="display:none;"></div>
       <div class="owe-detail" id="owed-detail" hidden></div>
@@ -332,6 +339,19 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
       <div class="fg"><label>Amount owed before tracking started ($)</label><input type="number" id="s-ow" step="0.01" placeholder="0.00"></div>
     </div>
     <div class="card">
+      <div class="ctitle">Shift logging</div>
+      <div class="trow" style="padding-bottom:8px;">
+        <label for="s-auto-logging">Automatic shift logging</label>
+        <input type="checkbox" class="tcb" id="s-auto-logging" onchange="updateShiftModeControls()">
+      </div>
+      <p class="snote" style="margin-bottom:12px;">Off = Manual (enter start and end times). On = Automatic (log start and log end).</p>
+      <div id="s-auto-break-wrap" class="fg setting-disabled">
+        <label for="s-break-threshold">Break auto-deduction threshold (hours)</label>
+        <input type="number" id="s-break-threshold" min="0.25" max="24" step="0.25" value="6" disabled>
+      </div>
+      <p class="snote">At or above this shift length, a break is deducted automatically. For shorter shifts, you'll be asked when logging the end. Cancel means no break.</p>
+    </div>
+    <div class="card">
       <div class="ctitle">Savings forecast</div>
       <div class="fg"><label>Custom savings target ($/week)</label><input type="number" id="s-weekly-savings" min="0" step="0.01" placeholder="0.00"></div>
       <p class="snote">Set to 0 to hide the custom forecast. This target is shown first on every savings goal.</p>
@@ -343,7 +363,7 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
     <div class="card">
       <div class="ctitle">Advanced</div>
       <div class="fg"><label>Mandatory break duration (minutes)</label><input type="number" id="s-brk" placeholder="30" min="0" max="120"></div>
-      <p class="snote">Applied when "break deducted" is toggled. Auto-suggested when shift is 6h+. Changing this does not affect already-logged shifts.</p>
+      <p class="snote">Applied when a break is deducted. Manual mode keeps its existing 6-hour suggestion; Automatic mode uses the threshold above. Changing this does not affect already-logged shifts.</p>
     </div>
     <button class="btn bp" onclick="saveCfg()">Save settings</button>
     <button class="btn bs" style="margin-top:10px;" onclick="openConfirm('Log out?',logout)">Log out</button>
@@ -468,7 +488,7 @@ const SB_KEY = 'sb_publishable_AuPjl9CFxQSxdTqtWW71_g_jY__JCSi';
 // ═══════════════════════════════════════
 
 let sb, user, isSignup=false;
-let cfg={baseRate:18,otRate:27,otThreshold:40,weekStartDay:4,startingOwed:0,taxRate:0,breakMinutes:30,weeklySavingsTarget:0};
+let cfg={baseRate:18,otRate:27,otThreshold:40,weekStartDay:4,startingOwed:0,taxRate:0,breakMinutes:30,weeklySavingsTarget:0,shiftLoggingMode:'manual',breakAutoThresholdHours:6,activeShiftStartedAt:null};
 const DEF_CATS=[{id:'rent',name:'Rent',emoji:'\uD83C\uDFE0'},{id:'spending',name:'Spending money',emoji:'\uD83D\uDCB3'},{id:'other',name:'Other',emoji:'\uD83D\uDCE6'}];
 let cats=[...DEF_CATS],shts=[],exps=[],recs=[],pays=[],gols=[],goalContributions=[],weekOverrides=[],goalHistoryReady=false;
 let cur='today',planPeriod='week',planOffset=0,moneyPeriod='week',moneyOffset=0;
@@ -551,10 +571,18 @@ async function loadAll(){
     weekOverrides=(g.data||[]).map(r=>({id:r.id,weekStart:r.week_start,daysCut:r.days_cut}));
     if(f.data){
       const s=f.data;
-      cfg={baseRate:+s.base_rate,otRate:+s.ot_rate,otThreshold:+s.ot_threshold,weekStartDay:s.week_start_day,startingOwed:+s.starting_owed||0,taxRate:+s.tax_rate||0,breakMinutes:+(s.break_minutes||30),weeklySavingsTarget:+s.weekly_savings_target||0};
+      cfg={baseRate:+s.base_rate,otRate:+s.ot_rate,otThreshold:+s.ot_threshold,weekStartDay:s.week_start_day,startingOwed:+s.starting_owed||0,taxRate:+s.tax_rate||0,breakMinutes:+(s.break_minutes||30),weeklySavingsTarget:+s.weekly_savings_target||0,shiftLoggingMode:s.shift_logging_mode==='automatic'?'automatic':'manual',breakAutoThresholdHours:+s.break_auto_threshold_hours||6,activeShiftStartedAt:s.active_shift_started_at||null};
       cats=s.categories||DEF_CATS;
+      // Recover from the rare case where a shift insert succeeded but clearing its active marker failed.
+      if(cfg.activeShiftStartedAt){
+        const activeAt=new Date(cfg.activeShiftStartedAt);
+        if(!Number.isNaN(activeAt.getTime())&&shts.some(x=>x.date===localDateStr(activeAt)&&x.start===localTimeStr(activeAt))){
+          const{error:recoverError}=await sb.from('user_settings').update({active_shift_started_at:null}).eq('user_id',uid);
+          if(!recoverError)cfg.activeShiftStartedAt=null;
+        }
+      }
     }else{
-      await sb.from('user_settings').insert({user_id:uid,base_rate:18,ot_rate:27,ot_threshold:40,week_start_day:4,starting_owed:0,tax_rate:0,break_minutes:30,weekly_savings_target:0,categories:DEF_CATS});
+      await sb.from('user_settings').insert({user_id:uid,base_rate:18,ot_rate:27,ot_threshold:40,week_start_day:4,starting_owed:0,tax_rate:0,break_minutes:30,weekly_savings_target:0,shift_logging_mode:'manual',break_auto_threshold_hours:6,active_shift_started_at:null,categories:DEF_CATS});
     }
     if(!goalHistoryReady)toast('Savings forecasts need the SQL migration: goal_forecast_migration.sql');
     try{
@@ -577,7 +605,9 @@ function setBusy(id,busy,txt){const b=document.getElementById(id);b.disabled=bus
 let _ic=0;
 function uid(){return Date.now().toString(36)+(++_ic).toString(36);}
 function pad(n){return String(n).padStart(2,'0');}
-function todayStr(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function todayStr(){return localDateStr(new Date());}
+function localDateStr(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function localTimeStr(d){return pad(d.getHours())+':'+pad(d.getMinutes());}
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 function dateFromStr(ds){const[y,m,d]=String(ds).split('-').map(Number);return new Date(Date.UTC(y,m-1,d));}
 function dateToStr(d){return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate());}
@@ -691,8 +721,23 @@ function renderToday(){
     thDetail.hidden=true;thRow.setAttribute('aria-expanded','false');
   }else{thWrap.style.display='none';}
   const ex=shts.find(s=>s.date===ds);
+  const autoMode=cfg.shiftLoggingMode==='automatic',activeStart=cfg.activeShiftStartedAt?new Date(cfg.activeShiftStartedAt):null;
+  const activeValid=activeStart&&!Number.isNaN(activeStart.getTime());
   document.getElementById('td-logged').style.display=ex?'block':'none';
-  document.getElementById('td-form').style.display=ex?'none':'block';
+  document.getElementById('td-form').style.display=(ex&&!(autoMode&&activeValid))?'none':'block';
+  document.getElementById('td-manual-form').style.display=autoMode?'none':'block';
+  const autoPanel=document.getElementById('td-auto-form');
+  autoPanel.hidden=!autoMode;
+  if(autoMode){
+    const status=document.getElementById('auto-shift-status'),startBtn=document.getElementById('auto-start-btn'),endBtn=document.getElementById('auto-end-btn');
+    if(activeValid){
+      status.textContent='Shift started '+fmtD(localDateStr(activeStart))+' at '+localTimeStr(activeStart)+'.';
+      startBtn.hidden=true;endBtn.hidden=false;
+    }else{
+      status.textContent='Log the start when you begin working.';
+      startBtn.hidden=false;endBtn.hidden=true;
+    }
+  }
   if(ex){
     const ph=paidHrs(ex),brkMins=ex.breakTaken?Math.round((ex.hours-ph)*60):0;
     document.getElementById('td-info').innerHTML='<div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;"><span style="font-size:1.2rem;font-weight:800;color:var(--r4);">'+ex.start+' \u2013 '+ex.end+'</span><span style="color:var(--mt);font-size:.82rem;font-weight:600;">'+ph.toFixed(2)+'h paid</span>'+(ex.breakTaken?'<span style="color:var(--am);font-size:.75rem;font-weight:600;">\u2212'+brkMins+'m break</span>':'')+'</div>'+(ex.note?'<div style="margin-top:4px;font-size:.77rem;color:var(--mt);">'+ex.note+'</div>':'');
@@ -719,6 +764,50 @@ async function logShift(){
     document.getElementById('t-break').checked=false;
     toast('\u273F Shift logged!');renderToday();
   }catch(err){toast('Error: '+err.message);}finally{btn.textContent='Log shift';btn.disabled=false;}
+}
+async function setActiveShiftStartedAt(value){
+  const{error}=await sb.from('user_settings').update({active_shift_started_at:value}).eq('user_id',user.id);
+  if(error)throw error;
+  cfg.activeShiftStartedAt=value;
+}
+async function startAutoShift(){
+  if(cfg.shiftLoggingMode!=='automatic'){toast('Automatic shift logging is disabled');return;}
+  if(cfg.activeShiftStartedAt){toast('A shift is already in progress');return;}
+  const ds=todayStr();
+  if(shts.some(s=>s.date===ds)){toast('A shift is already logged for today. Edit it from Today or History.');return;}
+  const btn=document.getElementById('auto-start-btn');btn.disabled=true;
+  try{
+    const startedAt=new Date();startedAt.setSeconds(0,0);
+    await setActiveShiftStartedAt(startedAt.toISOString());
+    toast('Shift started');renderToday();
+  }catch(e){toast('Could not log shift start: '+e.message);}
+  finally{btn.disabled=false;}
+}
+async function endAutoShift(){
+  if(cfg.shiftLoggingMode!=='automatic'||!cfg.activeShiftStartedAt){toast('No active shift found');return;}
+  const startAt=new Date(cfg.activeShiftStartedAt),endAt=new Date();endAt.setSeconds(0,0);
+  if(Number.isNaN(startAt.getTime())||endAt<=startAt){toast('Invalid shift start time');return;}
+  const ds=localDateStr(startAt),start=localTimeStr(startAt),end=localTimeStr(endAt),hours=shHrs(start,end);
+  if(hours<=0){toast('Shift duration must be greater than zero');return;}
+  if(shts.some(s=>s.date===ds)){
+    toast('A shift is already recorded for '+fmtD(ds)+'. Resolve that entry before ending this shift.');return;
+  }
+  const threshold=Number(cfg.breakAutoThresholdHours)||6;
+  let breakTaken=false;
+  if(hours>=threshold){breakTaken=cfg.breakMinutes>0;}
+  else if(cfg.breakMinutes>0){
+    breakTaken=window.confirm('Did you take a '+cfg.breakMinutes+'-minute break?\n\nOK = Yes, Cancel = No.');
+  }
+  const paidHours=breakTaken?Math.max(0,hours-cfg.breakMinutes/60):hours;
+  const btn=document.getElementById('auto-end-btn');btn.disabled=true;
+  try{
+    const row=await dbIns('shifts',{date:ds,start_time:start,end_time:end,hours,note:'',break_taken:breakTaken,paid_hours:paidHours,base_rate:cfg.baseRate,ot_rate:cfg.otRate,ot_threshold:cfg.otThreshold});
+    shts.push({id:row.id,date:ds,start,end,hours,note:'',breakTaken,paidHours,baseRate:cfg.baseRate,otRate:cfg.otRate,otThreshold:cfg.otThreshold});
+    try{await setActiveShiftStartedAt(null);}
+    catch(clearErr){cfg.activeShiftStartedAt=null;toast('Shift saved, but the active-session flag could not be cleared. Reload and check Today.');renderToday();return;}
+    toast(breakTaken&&hours>=threshold?'Shift logged · automatic break deducted':'Shift logged');renderToday();
+  }catch(e){toast('Could not log shift end: '+e.message);}
+  finally{btn.disabled=false;}
 }
 function editToday(){const s=shts.find(x=>x.date===todayStr());if(s)openEdit(s.id);}
 
@@ -912,9 +1001,9 @@ function renderMoney(){
   estEl.textContent='Est take home  '+fmtMoney(netOf(o));
   estEl.style.display=taxSet?'block':'none';
   document.getElementById('owed-detail').innerHTML=
-    '<div class="owe-summary-row"><span>Earned</span><span class="owe-summary-value">'+fmtMoney(earned)+'</span><span class="owe-summary-caret" aria-hidden="true">⌃</span></div>'+
+    '<div class="owe-summary-row"><span>Earned</span><span class="owe-summary-value">'+fmtMoney(earned)+'</span></div>'+
     '<div class="owe-summary-help">Gross pay from '+shiftsCount+' logged shifts across '+payPeriods+' pay periods, calculated using each shift’s saved hourly rates and overtime rules.</div>'+
-    '<div class="owe-summary-row"><span>Received</span><span class="owe-summary-value">'+fmtMoney(paid)+'</span><span class="owe-summary-caret" aria-hidden="true">⌃</span></div>'+
+    '<div class="owe-summary-row"><span>Received</span><span class="owe-summary-value">'+fmtMoney(paid)+'</span></div>'+
     '<div class="owe-summary-help">'+fmtMoney(paid)+' is the sum of '+pays.length+' recorded payment'+(pays.length===1?'':'s')+'.</div>';
   const owedToggle=document.getElementById('owed-toggle');owedToggle.setAttribute('aria-expanded','false');document.getElementById('owed-detail').hidden=true;
   const range=getPeriodRange(moneyPeriod,moneyOffset);
@@ -1072,18 +1161,28 @@ function renderPlan(){
 }
 
 // ═══ SETTINGS ═══
+function updateShiftModeControls(){
+  const automatic=document.getElementById('s-auto-logging').checked,wrap=document.getElementById('s-auto-break-wrap'),input=document.getElementById('s-break-threshold');
+  input.disabled=!automatic;wrap.classList.toggle('setting-disabled',!automatic);
+}
 function renderSettings(){
   document.getElementById('s-base').value=cfg.baseRate;document.getElementById('s-thr').value=cfg.otThreshold;document.getElementById('s-ot').value=cfg.otRate;document.getElementById('s-tax').value=cfg.taxRate||0;document.getElementById('s-wk').value=cfg.weekStartDay;document.getElementById('s-ow').value=cfg.startingOwed||0;document.getElementById('s-brk').value=cfg.breakMinutes||30;document.getElementById('s-weekly-savings').value=cfg.weeklySavingsTarget||0;
-  renderCats();updateBreakLabels();
+  document.getElementById('s-auto-logging').checked=cfg.shiftLoggingMode==='automatic';document.getElementById('s-break-threshold').value=cfg.breakAutoThresholdHours||6;
+  updateShiftModeControls();renderCats();updateBreakLabels();
 }
 async function saveCfg(){
   const br=parseFloat(document.getElementById('s-base').value),thr=parseFloat(document.getElementById('s-thr').value),ot=parseFloat(document.getElementById('s-ot').value),tax=parseFloat(document.getElementById('s-tax').value)||0,ws=parseInt(document.getElementById('s-wk').value),so=parseFloat(document.getElementById('s-ow').value)||0,brk=parseInt(document.getElementById('s-brk').value)||30,weeklySavingsTarget=parseFloat(document.getElementById('s-weekly-savings').value)||0;
+  const shiftLoggingMode=document.getElementById('s-auto-logging').checked?'automatic':'manual',breakAutoThresholdHours=parseFloat(document.getElementById('s-break-threshold').value);
   if(isNaN(br)||isNaN(thr)||isNaN(ot)){toast('Fill in all rate fields');return;}
   if(weeklySavingsTarget<0){toast('Custom weekly savings target cannot be negative');return;}
-  cfg={...cfg,baseRate:br,otThreshold:thr,otRate:ot,taxRate:tax,weekStartDay:ws,startingOwed:so,breakMinutes:brk,weeklySavingsTarget};
-  updateBreakLabels();
-  try{await sb.from('user_settings').upsert({user_id:user.id,base_rate:br,ot_rate:ot,ot_threshold:thr,week_start_day:ws,starting_owed:so,tax_rate:tax,break_minutes:brk,weekly_savings_target:weeklySavingsTarget,categories:cats},{onConflict:'user_id'});toast('Settings saved \u2713');renderPlan();}
-  catch(e){toast('Error: '+e.message);}
+  if(shiftLoggingMode==='automatic'&&(!Number.isFinite(breakAutoThresholdHours)||breakAutoThresholdHours<0.25||breakAutoThresholdHours>24)){toast('Break threshold must be between 0.25 and 24 hours');return;}
+  if(cfg.activeShiftStartedAt&&shiftLoggingMode!=='automatic'){toast('Finish the active automatic shift before switching to Manual');document.getElementById('s-auto-logging').checked=true;updateShiftModeControls();return;}
+  const nextCfg={...cfg,baseRate:br,otThreshold:thr,otRate:ot,taxRate:tax,weekStartDay:ws,startingOwed:so,breakMinutes:brk,weeklySavingsTarget,shiftLoggingMode,breakAutoThresholdHours:breakAutoThresholdHours||6};
+  try{
+    const{error}=await sb.from('user_settings').upsert({user_id:user.id,base_rate:br,ot_rate:ot,ot_threshold:thr,week_start_day:ws,starting_owed:so,tax_rate:tax,break_minutes:brk,weekly_savings_target:weeklySavingsTarget,shift_logging_mode:shiftLoggingMode,break_auto_threshold_hours:nextCfg.breakAutoThresholdHours,active_shift_started_at:cfg.activeShiftStartedAt,categories:cats},{onConflict:'user_id'});
+    if(error)throw error;
+    cfg=nextCfg;updateBreakLabels();toast('Settings saved \u2713');renderPlan();renderToday();
+  }catch(e){toast('Error: '+e.message);}
 }
 function renderCats(){document.getElementById('cats-list').innerHTML=cats.map(c=>'<div class="litem"><div class="lico">'+c.emoji+'</div><div class="linf"><div class="lname">'+c.name+'</div></div><button class="btn bs bsm" style="color:var(--rd);background:var(--rdb);" onclick="openConfirm(\'Delete category?\',()=>delCat(\''+c.id+'\'))">&#10005;</button></div>').join('');}
 async function delCat(id){cats=cats.filter(c=>c.id!==id);try{await sb.from('user_settings').update({categories:cats}).eq('user_id',user.id);renderCats();}catch(e){toast('Error: '+e.message);}}
