@@ -91,6 +91,10 @@ input:focus,select:focus{border-color:var(--r4);background:#fff;}
 .pfill{height:100%;background:var(--r6);border-radius:4px;transition:width .4s ease;}
 .gfoot{display:flex;justify-content:space-between;align-items:center;margin-top:6px;}
 .gshifts{font-size:.74rem;font-weight:700;color:var(--r6);}
+.gforecast{margin-top:10px;padding-top:9px;border-top:1px solid rgba(155,58,92,.16);display:grid;gap:5px;}
+.gforecast-row{font-size:.72rem;color:var(--tx);line-height:1.4;}
+.gforecast-row strong{font-weight:800;color:var(--r6);}
+.gforecast-note{font-size:.67rem;color:var(--mt);line-height:1.45;}
 .mrow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bd);}
 .mrow:last-child{border-bottom:none;}
 .mlbl{font-size:.83rem;color:var(--mt);font-weight:500;}
@@ -179,14 +183,14 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
         <div class="sl tap-hint">hrs this week</div>
       </div>
       <div class="stat tap" onclick="openGrossDetail()">
-        <div class="sv g" id="wg">$0</div>
+        <div class="sv g" id="wg">$0.00</div>
         <div class="sl tap-hint">gross this week</div>
       </div>
       <div class="stat"><div class="sv a" id="wo">0.0</div><div class="sl">OT hours</div></div>
       <div class="stat"><div class="sv m" id="wu">40.0</div><div class="sl">hrs until OT</div></div>
     </div>
     <div id="th-row" style="display:none;" class="takehome">
-      <span class="th-l">✿ Est. take-home after tax</span><span class="th-v" id="th-v">$0</span>
+      <span class="th-l">✿ Est. take-home after tax</span><span class="th-v" id="th-v">$0.00</span>
     </div>
     <div class="card" id="td-logged" style="display:none;">
       <div class="row"><span class="ctitle" style="margin:0;">Today's shift</span><button class="btn bs bsm" onclick="editToday()">Edit</button></div>
@@ -239,6 +243,7 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
     </div>
     <div class="card">
       <div class="row"><span class="ctitle" style="margin:0;">Recurring payments</span><button class="btn bs bsm" onclick="openRecSh()">+ Add</button></div>
+      <p class="snote">Tracked separately from regular expenses. A payment is included in the selected period's expenses only when its scheduled date falls within that period.</p>
       <div id="recs-list" style="margin-top:8px;"></div>
       <div id="rec-tot"></div>
     </div>
@@ -289,6 +294,11 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
         <select id="s-wk"><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select>
       </div>
       <div class="fg"><label>Amount owed before tracking started ($)</label><input type="number" id="s-ow" step="0.01" placeholder="0.00"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle">Savings forecast</div>
+      <div class="fg"><label>Custom savings target ($/week)</label><input type="number" id="s-weekly-savings" min="0" step="0.01" placeholder="0.00"></div>
+      <p class="snote">Set to 0 to hide the custom forecast. This target is shown first on every savings goal.</p>
     </div>
     <div class="card">
       <div class="row" style="margin-bottom:12px;"><span class="ctitle" style="margin:0;">Expense categories</span><button class="btn bs bsm" onclick="openCatSh()">+ Add</button></div>
@@ -413,9 +423,9 @@ const SB_KEY = 'sb_publishable_AuPjl9CFxQSxdTqtWW71_g_jY__JCSi';
 // ═══════════════════════════════════════
 
 let sb, user, isSignup=false;
-let cfg={baseRate:18,otRate:27,otThreshold:40,weekStartDay:4,startingOwed:0,taxRate:0,breakMinutes:30};
+let cfg={baseRate:18,otRate:27,otThreshold:40,weekStartDay:4,startingOwed:0,taxRate:0,breakMinutes:30,weeklySavingsTarget:0};
 const DEF_CATS=[{id:'rent',name:'Rent',emoji:'\uD83C\uDFE0'},{id:'spending',name:'Spending money',emoji:'\uD83D\uDCB3'},{id:'other',name:'Other',emoji:'\uD83D\uDCE6'}];
-let cats=[...DEF_CATS],shts=[],exps=[],recs=[],pays=[],gols=[],weekOverrides=[];
+let cats=[...DEF_CATS],shts=[],exps=[],recs=[],pays=[],gols=[],goalContributions=[],weekOverrides=[],goalHistoryReady=false;
 let cur='today',planPeriod='week',planOffset=0,moneyPeriod='week',moneyOffset=0;
 let _eid=null,_gid=null;
 
@@ -467,14 +477,15 @@ async function signInWithGoogle(){
 async function loadAll(){
   const uid=user.id;
   try{
-    const[a,b,c,d,e,f,g]=await Promise.all([
+    const[a,b,c,d,e,f,g,h]=await Promise.all([
       sb.from('shifts').select('*').eq('user_id',uid),
       sb.from('expenses').select('*').eq('user_id',uid),
       sb.from('recurring').select('*').eq('user_id',uid),
       sb.from('payments_received').select('*').eq('user_id',uid),
       sb.from('goals').select('*').eq('user_id',uid),
       sb.from('user_settings').select('*').eq('user_id',uid).maybeSingle(),
-      sb.from('week_overrides').select('*').eq('user_id',uid)
+      sb.from('week_overrides').select('*').eq('user_id',uid),
+      sb.from('goal_contributions').select('*').eq('user_id',uid)
     ]);
     // paid_hours stored on shift; fallback for legacy data: break_taken assumes 30min
     shts=(a.data||[]).map(r=>({
@@ -486,15 +497,18 @@ async function loadAll(){
     exps=(b.data||[]).map(r=>({id:r.id,name:r.name,amount:+r.amount,catId:r.cat_id,date:r.date}));
     recs=(c.data||[]).map(r=>({id:r.id,name:r.name,amount:+r.amount,day:r.day_of_month}));
     pays=(d.data||[]).map(r=>({id:r.id,amount:+r.amount,date:r.date,note:r.note||''}));
-    gols=(e.data||[]).map(r=>({id:r.id,name:r.name,target:+r.target,saved:+r.saved}));
+    gols=(e.data||[]).map(r=>({id:r.id,name:r.name,target:+r.target,saved:+r.saved,startedOn:r.started_on||todayStr(),historyStartedOn:r.history_started_on||todayStr()}));
+    goalHistoryReady=!h.error;
+    goalContributions=(h.data||[]).map(r=>({id:r.id,goalId:r.goal_id,amount:+r.amount,date:r.contribution_date,openingBalance:!!r.is_opening_balance,createdAt:r.created_at}));
     weekOverrides=(g.data||[]).map(r=>({id:r.id,weekStart:r.week_start,daysCut:r.days_cut}));
     if(f.data){
       const s=f.data;
-      cfg={baseRate:+s.base_rate,otRate:+s.ot_rate,otThreshold:+s.ot_threshold,weekStartDay:s.week_start_day,startingOwed:+s.starting_owed||0,taxRate:+s.tax_rate||0,breakMinutes:+(s.break_minutes||30)};
+      cfg={baseRate:+s.base_rate,otRate:+s.ot_rate,otThreshold:+s.ot_threshold,weekStartDay:s.week_start_day,startingOwed:+s.starting_owed||0,taxRate:+s.tax_rate||0,breakMinutes:+(s.break_minutes||30),weeklySavingsTarget:+s.weekly_savings_target||0};
       cats=s.categories||DEF_CATS;
     }else{
-      await sb.from('user_settings').insert({user_id:uid,base_rate:18,ot_rate:27,ot_threshold:40,week_start_day:4,starting_owed:0,tax_rate:0,break_minutes:30,categories:DEF_CATS});
+      await sb.from('user_settings').insert({user_id:uid,base_rate:18,ot_rate:27,ot_threshold:40,week_start_day:4,starting_owed:0,tax_rate:0,break_minutes:30,weekly_savings_target:0,categories:DEF_CATS});
     }
+    if(!goalHistoryReady)toast('Savings forecasts need the SQL migration: goal_forecast_migration.sql');
   }catch(e){toast('Error loading: '+e.message);}
 }
 
@@ -509,22 +523,38 @@ let _ic=0;
 function uid(){return Date.now().toString(36)+(++_ic).toString(36);}
 function pad(n){return String(n).padStart(2,'0');}
 function todayStr(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
-function fmtD(s){return new Date(s+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});}
-function fmtRng(a,b){return new Date(a+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+' \u2013 '+new Date(b+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+function dateFromStr(ds){const[y,m,d]=String(ds).split('-').map(Number);return new Date(Date.UTC(y,m-1,d));}
+function dateToStr(d){return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate());}
+function addDays(ds,days){const d=dateFromStr(ds);d.setUTCDate(d.getUTCDate()+days);return dateToStr(d);}
+function fmtD(s){return dateFromStr(s).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'});}
+function fmtRng(a,b){return dateFromStr(a).toLocaleDateString('en-US',{timeZone:'UTC',month:'short',day:'numeric'})+' \u2013 '+dateFromStr(b).toLocaleDateString('en-US',{timeZone:'UTC',month:'short',day:'numeric'});}
 function t2m(t){const[h,m]=t.split(':').map(Number);return h*60+m;}
 function shHrs(s,e){let d=t2m(e)-t2m(s);if(d<0)d+=1440;return d/60;}
-function wkStart(ds){const d=new Date(ds+'T12:00:00'),diff=(d.getDay()-cfg.weekStartDay+7)%7;d.setDate(d.getDate()-diff);return d.toISOString().split('T')[0];}
-function wkEnd(ws){const d=new Date(ws+'T12:00:00');d.setDate(d.getDate()+6);return d.toISOString().split('T')[0];}
+function getWeekStartDay(){const n=Number(cfg.weekStartDay);return Number.isInteger(n)&&n>=0&&n<=6?n:0;}
+function wkStart(ds){const d=dateFromStr(ds),diff=(d.getUTCDay()-getWeekStartDay()+7)%7;d.setUTCDate(d.getUTCDate()-diff);return dateToStr(d);}
+function wkEnd(ws){return addDays(ws,6);}
 function getPayPeriodEnd(ws){
   const ov=weekOverrides.find(o=>o.weekStart===ws);
-  if(ov){const d=new Date(ws+'T12:00:00');d.setDate(d.getDate()+6-ov.daysCut);return d.toISOString().split('T')[0];}
-  return wkEnd(ws);
+  const rawCut=ov?Number(ov.daysCut):0;
+  const daysCut=Number.isFinite(rawCut)?Math.min(6,Math.max(0,Math.trunc(rawCut))):0;
+  return addDays(ws,6-daysCut);
 }
 function getPayPeriodStart(ds){
-  const nws=wkStart(ds),effEnd=getPayPeriodEnd(nws);
-  if(ds>effEnd){const d=new Date(nws+'T12:00:00');d.setDate(d.getDate()+7);return d.toISOString().split('T')[0];}
-  return nws;
+  const normalStart=wkStart(ds);
+  return ds>getPayPeriodEnd(normalStart)?addDays(normalStart,7):normalStart;
 }
+// A shortened previous week can move its final day(s) into this period.
+function getPayPeriodDisplayStart(ws){
+  let start=ws;
+  for(let i=1;i<=6;i++){
+    const previous=addDays(ws,-i);
+    if(getPayPeriodStart(previous)===ws)start=previous;
+    else break;
+  }
+  return start;
+}
+function getPayPeriodShifts(ws){return shts.filter(s=>getPayPeriodStart(s.date)===ws).sort((a,b)=>a.date.localeCompare(b.date));}
+function getPayPeriodRange(ws){return{start:getPayPeriodDisplayStart(ws),end:getPayPeriodEnd(ws)};}
 
 // BREAK — paidHours is stored on shift at time of save (independent of current cfg)
 function paidHrs(s){return s.paidHours!==undefined&&s.paidHours!==null?s.paidHours:s.hours;}
@@ -536,6 +566,7 @@ function fmtHrsFull(h){
   return{dec,hm,formula};
 }
 
+function fmtMoney(n){const v=Number(n);if(!Number.isFinite(v))return '$0.00';return(v<0?'-':'')+'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function calcWk(wss){
   if(!wss.length)return{tot:0,paidTot:0,reg:0,ot:0,earned:0};
   const s0=[...wss].sort((a,b)=>a.date.localeCompare(b.date))[0];
@@ -556,10 +587,17 @@ function allEarned(){const m={};shts.forEach(s=>{const ws=getPayPeriodStart(s.da
 function totalPaid(){return pays.reduce((s,p)=>s+p.amount,0);}
 function owed(){return Math.max(0,allEarned()+(cfg.startingOwed||0)-totalPaid());}
 function getPeriodRange(type,off){
-  const now=new Date();
-  if(type==='week'){const ws=wkStart(todayStr());const d=new Date(ws+'T12:00:00');d.setDate(d.getDate()+off*7);const start=d.toISOString().split('T')[0],end=wkEnd(start);return{start,end,label:(off===0?'This week \u00B7 ':'')+fmtRng(start,end)};}
-  if(type==='month'){const d=new Date(now.getFullYear(),now.getMonth()+off,1);const y=d.getFullYear(),m=d.getMonth();const start=y+'-'+pad(m+1)+'-01',end=y+'-'+pad(m+1)+'-'+pad(new Date(y,m+1,0).getDate());return{start,end,label:(off===0?'This month \u00B7 ':'')+d.toLocaleDateString('en-US',{month:'long',year:'numeric'})};}
-  const y=now.getFullYear()+off;return{start:y+'-01-01',end:y+'-12-31',label:(off===0?'This year \u00B7 ':'')+String(y)};
+  const today=dateFromStr(todayStr());
+  if(type==='week'){
+    const currentStart=getPayPeriodStart(todayStr()),ws=addDays(currentStart,off*7),range=getPayPeriodRange(ws);
+    return{...range,label:(off===0?'This week \u00B7 ':'')+fmtRng(range.start,range.end)};
+  }
+  if(type==='month'){
+    const d=new Date(Date.UTC(today.getUTCFullYear(),today.getUTCMonth()+off,1)),y=d.getUTCFullYear(),m=d.getUTCMonth();
+    const start=dateToStr(d),end=dateToStr(new Date(Date.UTC(y,m+1,0)));
+    return{start,end,label:(off===0?'This month \u00B7 ':'')+d.toLocaleDateString('en-US',{timeZone:'UTC',month:'long',year:'numeric'})};
+  }
+  const y=today.getUTCFullYear()+off;return{start:y+'-01-01',end:y+'-12-31',label:(off===0?'This year \u00B7 ':'')+String(y)};
 }
 
 // Update break label text from current settings
@@ -579,18 +617,18 @@ function rndr(p){if(p==='today')renderToday();if(p==='history')renderHistory();i
 
 // ═══ TODAY ═══
 function renderToday(){
-  const now=new Date(),ds=todayStr(),ws=getPayPeriodStart(ds),we=getPayPeriodEnd(ws);
+  const now=new Date(),ds=todayStr(),ws=getPayPeriodStart(ds),periodRange=getPayPeriodRange(ws),we=periodRange.end;
   document.getElementById('hd').textContent='Today, '+now.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-  document.getElementById('hw').textContent='Week of '+fmtRng(ws,we);
+  document.getElementById('hw').textContent='Week of '+fmtRng(periodRange.start,we);
   updateBreakLabels();
-  const wss=shts.filter(s=>s.date>=ws&&s.date<=we);
+  const wss=getPayPeriodShifts(ws);
   const{paidTot,ot,earned}=calcWk(wss),toOT=Math.max(0,cfg.otThreshold-paidTot);
   document.getElementById('wh').textContent=paidTot.toFixed(1);
-  document.getElementById('wg').textContent='$'+earned.toFixed(0);
+  document.getElementById('wg').textContent=fmtMoney(earned);
   document.getElementById('wo').textContent=ot.toFixed(1);
   document.getElementById('wu').textContent=toOT>0?toOT.toFixed(1):'\u2014';
   const taxSet=(cfg.taxRate||0)>0,thr=document.getElementById('th-row');
-  if(taxSet&&earned>0){thr.style.display='flex';document.getElementById('th-v').textContent='$'+netOf(earned).toFixed(2)+' ('+cfg.taxRate+'% off)';}else{thr.style.display='none';}
+  if(taxSet&&earned>0){thr.style.display='flex';document.getElementById('th-v').textContent=fmtMoney(netOf(earned))+' ('+cfg.taxRate+'% off)';}else{thr.style.display='none';}
   const ex=shts.find(s=>s.date===ds);
   document.getElementById('td-logged').style.display=ex?'block':'none';
   document.getElementById('td-form').style.display=ex?'none':'block';
@@ -625,8 +663,8 @@ function editToday(){const s=shts.find(x=>x.date===todayStr());if(s)openEdit(s.i
 
 // ═══ DETAIL SHEETS ═══
 function openHrsDetail(){
-  const ds=todayStr(),ws=getPayPeriodStart(ds),we=getPayPeriodEnd(ws);
-  const wss=shts.filter(s=>s.date>=ws&&s.date<=we).sort((a,b)=>a.date.localeCompare(b.date));
+  const ds=todayStr(),ws=getPayPeriodStart(ds);
+  const wss=getPayPeriodShifts(ws);
   const el=document.getElementById('hrs-detail-content');
   if(!wss.length){el.innerHTML='<div class="empty"><p>No shifts this week yet</p></div>';op('sh-hrs-detail');return;}
   const{paidTot,ot}=calcWk(wss);
@@ -653,8 +691,8 @@ function openHrsDetail(){
   el.innerHTML=html;op('sh-hrs-detail');
 }
 function openGrossDetail(){
-  const ds=todayStr(),ws=getPayPeriodStart(ds),we=getPayPeriodEnd(ws);
-  const wss=shts.filter(s=>s.date>=ws&&s.date<=we).sort((a,b)=>a.date.localeCompare(b.date));
+  const ds=todayStr(),ws=getPayPeriodStart(ds);
+  const wss=getPayPeriodShifts(ws);
   const el=document.getElementById('gross-detail-content');
   if(!wss.length){el.innerHTML='<div class="empty"><p>No shifts this week yet</p></div>';op('sh-gross-detail');return;}
   const{reg,ot,earned}=calcWk(wss);
@@ -663,9 +701,9 @@ function openGrossDetail(){
   let html='';
   wss.forEach(s=>{
     const ph=paidHrs(s),pay=payMap.get(s.id)||0,brkMins=s.breakTaken?Math.round((s.hours-ph)*60):0;
-    html+='<div class="drow" style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:.85rem;font-weight:700;">'+fmtD(s.date)+'</div><div style="font-size:.74rem;color:var(--mt);">'+ph.toFixed(2)+'h paid'+(s.breakTaken?' (\u2212'+brkMins+'m break)':'')+'</div></div><span style="font-weight:800;font-size:.95rem;color:var(--r4);">$'+pay.toFixed(2)+'</span></div>';
+    html+='<div class="drow" style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:.85rem;font-weight:700;">'+fmtD(s.date)+'</div><div style="font-size:.74rem;color:var(--mt);">'+ph.toFixed(2)+'h paid'+(s.breakTaken?' (\u2212'+brkMins+'m break)':'')+'</div></div><span style="font-weight:800;font-size:.95rem;color:var(--r4);">'+fmtMoney(pay)+'</span></div>';
   });
-  html+='<div class="dtotal"><div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:.8rem;color:var(--mt);">Regular '+reg.toFixed(2)+'h \u00D7 $'+br+'</span><span style="font-weight:700;">$'+(reg*br).toFixed(2)+'</span></div>'+(ot>0?'<div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:.8rem;color:var(--am);">OT '+ot.toFixed(2)+'h \u00D7 $'+otr+'</span><span style="font-weight:700;color:var(--am);">$'+(ot*otr).toFixed(2)+'</span></div>':'')+'<div style="display:flex;justify-content:space-between;border-top:1px solid var(--bd);padding-top:8px;margin-top:4px;"><span style="font-weight:800;">Total</span><span style="font-weight:800;font-size:1.1rem;color:var(--gn);">$'+earned.toFixed(2)+'</span></div></div>';
+  html+='<div class="dtotal"><div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:.8rem;color:var(--mt);">Regular '+reg.toFixed(2)+'h × '+fmtMoney(br)+'/hr</span><span style="font-weight:700;">'+fmtMoney(reg*br)+'</span></div>'+(ot>0?'<div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:.8rem;color:var(--am);">OT '+ot.toFixed(2)+'h × '+fmtMoney(otr)+'/hr</span><span style="font-weight:700;color:var(--am);">'+fmtMoney(ot*otr)+'</span></div>':'')+'<div style="display:flex;justify-content:space-between;border-top:1px solid var(--bd);padding-top:8px;margin-top:4px;"><span style="font-weight:800;">Total</span><span style="font-weight:800;font-size:1.1rem;color:var(--gn);">'+fmtMoney(earned)+'</span></div></div>';
   el.innerHTML=html;op('sh-gross-detail');
 }
 
@@ -686,13 +724,13 @@ function renderHistory(){
     const payMap=new Map(perShiftPay(gShifts).map(x=>[x.id,x.pay]));
     // Toggle always visible — consecutive short weeks are fully supported
     const toggleHtml='<label class="wov-wrap"><input type="checkbox" class="wov"'+(ov?' checked':'')+' onchange="toggleWeekOverride(\''+ps+'\',this.checked)"><span class="wov-lbl">Short</span></label>';
-    html+='<div class="whdr"><span>'+fmtRng(minD,maxD)+' \u00B7 '+paidTot.toFixed(1)+'h \u00B7 $'+earned.toFixed(2)+'</span><div style="display:flex;align-items:center;gap:6px;">'+(ot>0?'<span class="badge bot">'+ot.toFixed(1)+' OT</span>':'')+toggleHtml+'</div></div>';
+    html+='<div class="whdr"><span>'+fmtRng(minD,maxD)+' \u00B7 '+paidTot.toFixed(1)+'h \u00B7 '+fmtMoney(earned)+'</span><div style="display:flex;align-items:center;gap:6px;">'+(ot>0?'<span class="badge bot">'+ot.toFixed(1)+' OT</span>':'')+toggleHtml+'</div></div>';
     gShifts.sort((a,b)=>b.date.localeCompare(a.date)).forEach(s=>{
       const ph=paidHrs(s),pay=payMap.get(s.id)||0,brkMins=s.breakTaken?Math.round((s.hours-ph)*60):0;
       const brkTag=s.breakTaken?'<span style="font-size:.67rem;color:var(--am);">\u2212'+brkMins+'m</span>':'';
       // Overflow indicator: shift belongs to a different normal week (carried over from prev short week)
       const overTag=wkStart(s.date)!==ps?'<span style="font-size:.64rem;color:var(--r4);font-weight:700;" title="Carried over from previous pay period">\u2191prev</span>':'';
-      html+='<div class="srow" onclick="openEdit(\''+s.id+'\')"><div class="sdot"></div><div class="sinf"><div class="sdate">'+fmtD(s.date)+' '+overTag+'</div><div class="stime">'+s.start+' \u2013 '+s.end+(s.note?' \u00B7 '+s.note:'')+' '+brkTag+'</div></div><div class="sright"><div class="shrs">'+ph.toFixed(1)+'h</div><div class="spay">~$'+pay.toFixed(2)+'</div></div></div>';
+      html+='<div class="srow" onclick="openEdit(\''+s.id+'\')"><div class="sdot"></div><div class="sinf"><div class="sdate">'+fmtD(s.date)+' '+overTag+'</div><div class="stime">'+s.start+' \u2013 '+s.end+(s.note?' \u00B7 '+s.note:'')+' '+brkTag+'</div></div><div class="sright"><div class="shrs">'+ph.toFixed(1)+'h</div><div class="spay">~'+fmtMoney(pay)+'</div></div></div>';
     });
   });
   el.innerHTML=html;
@@ -705,66 +743,143 @@ async function toggleWeekOverride(ws,on){
   }catch(e){toast('Error: '+e.message);}
 }
 
+// Recurring payments occur on their configured calendar day; day 29-31 is clamped to month-end.
+function recurringOccurrences(start,end){
+  const out=[];
+  const a=dateFromStr(start),b=dateFromStr(end);
+  let y=a.getUTCFullYear(),m=a.getUTCMonth();
+  const lastY=b.getUTCFullYear(),lastM=b.getUTCMonth();
+  while(y<lastY||(y===lastY&&m<=lastM)){
+    const daysInMonth=new Date(Date.UTC(y,m+1,0)).getUTCDate();
+    recs.forEach(r=>{
+      const day=Math.min(Math.max(1,Math.trunc(Number(r.day)||1)),daysInMonth);
+      const date=dateToStr(new Date(Date.UTC(y,m,day)));
+      if(date>=start&&date<=end)out.push({id:r.id,name:r.name,amount:r.amount,date});
+    });
+    m++;if(m>11){m=0;y++;}
+  }
+  return out.sort((x,y)=>x.date.localeCompare(y.date)||x.name.localeCompare(y.name));
+}
+
 // ═══ MONEY ═══
 function setMoneyPeriod(p,btn){moneyPeriod=p;moneyOffset=0;btn.closest('.piltabs').querySelectorAll('.piltab').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderMoney();}
 function shiftMoneyOff(d){moneyOffset+=d;if(moneyOffset>0)moneyOffset=0;renderMoney();}
 function renderMoney(){
   const o=owed(),earned=allEarned(),paid=totalPaid(),taxSet=(cfg.taxRate||0)>0;
-  document.getElementById('o-amt').textContent='$'+o.toFixed(2);
-  document.getElementById('o-sub').textContent='$'+earned.toFixed(2)+' earned \u00B7 $'+paid.toFixed(2)+' received'+(taxSet?' \u00B7 est. take-home $'+netOf(o).toFixed(2):'');
+  document.getElementById('o-amt').textContent=fmtMoney(o);
+  document.getElementById('o-sub').textContent=fmtMoney(earned)+' earned \u00B7 '+fmtMoney(paid)+' received'+(taxSet?' \u00B7 est. take-home '+fmtMoney(netOf(o)):'');
   const range=getPeriodRange(moneyPeriod,moneyOffset);
   document.getElementById('mn-lbl').textContent=range.label;
   document.getElementById('mn-next').style.opacity=moneyOffset>=0?'0.3':'1';
   document.getElementById('mn-next').style.pointerEvents=moneyOffset>=0?'none':'auto';
   const paysP=pays.filter(p=>p.date>=range.start&&p.date<=range.end).sort((a,b)=>b.date.localeCompare(a.date));
   const expsP=exps.filter(e=>e.date>=range.start&&e.date<=range.end).sort((a,b)=>b.date.localeCompare(a.date));
-  document.getElementById('pays-list').innerHTML=paysP.length?paysP.map(p=>'<div class="litem"><div class="lico">\uD83D\uDCB5</div><div class="linf"><div class="lname">'+(p.note||'Payment received')+'</div><div class="lsub">'+fmtD(p.date)+'</div></div><div class="lact"><span class="lamt" style="color:var(--gn);">+$'+p.amount.toFixed(2)+'</span><button class="btn bs bsm" onclick="openConfirm(\'Remove?\',()=>delPay(\''+p.id+'\'))">&#10005;</button></div></div>').join(''):'<div class="empty" style="padding:12px 0 2px;"><p>No payments in this period</p></div>';
+  document.getElementById('pays-list').innerHTML=paysP.length?paysP.map(p=>'<div class="litem"><div class="lico">\uD83D\uDCB5</div><div class="linf"><div class="lname">'+(p.note||'Payment received')+'</div><div class="lsub">'+fmtD(p.date)+'</div></div><div class="lact"><span class="lamt" style="color:var(--gn);">+'+fmtMoney(p.amount)+'</span><button class="btn bs bsm" onclick="openConfirm(\'Remove?\',()=>delPay(\''+p.id+'\'))">&#10005;</button></div></div>').join(''):'<div class="empty" style="padding:12px 0 2px;"><p>No payments in this period</p></div>';
   const catMap=Object.fromEntries(cats.map(c=>[c.id,c]));
-  document.getElementById('exps-list').innerHTML=expsP.length?expsP.map(e=>{const c=catMap[e.catId]||{emoji:'\uD83D\uDCE6',name:'Other'};return'<div class="litem"><div class="lico">'+c.emoji+'</div><div class="linf"><div class="lname">'+e.name+'</div><div class="lsub">'+c.name+' \u00B7 '+fmtD(e.date)+'</div></div><div class="lact"><span class="lamt">$'+e.amount.toFixed(2)+'</span><button class="btn bs bsm" onclick="openConfirm(\'Delete?\',()=>delExp(\''+e.id+'\'))">&#10005;</button></div></div>';}).join(''):'<div class="empty" style="padding:12px 0 2px;"><p>No expenses in this period</p></div>';
+  document.getElementById('exps-list').innerHTML=expsP.length?expsP.map(e=>{const c=catMap[e.catId]||{emoji:'\uD83D\uDCE6',name:'Other'};return'<div class="litem"><div class="lico">'+c.emoji+'</div><div class="linf"><div class="lname">'+e.name+'</div><div class="lsub">'+c.name+' \u00B7 '+fmtD(e.date)+'</div></div><div class="lact"><span class="lamt">'+fmtMoney(e.amount)+'</span><button class="btn bs bsm" onclick="openConfirm(\'Delete?\',()=>delExp(\''+e.id+'\'))">&#10005;</button></div></div>';}).join(''):'<div class="empty" style="padding:12px 0 2px;"><p>No expenses in this period</p></div>';
   const rEl=document.getElementById('recs-list'),rtEl=document.getElementById('rec-tot');
-  if(!recs.length){rEl.innerHTML='<div class="empty" style="padding:12px 0 2px;"><p>No recurring payments</p></div>';rtEl.innerHTML='';return;}
-  const tot=recs.reduce((s,r)=>s+r.amount,0);
-  rEl.innerHTML=recs.map(r=>'<div class="litem"><div class="lico">\uD83D\uDD01</div><div class="linf"><div class="lname">'+r.name+'</div><div class="lsub">Every month, day '+r.day+'</div></div><div class="lact"><span class="lamt">$'+r.amount.toFixed(2)+'/mo</span><button class="btn bs bsm" onclick="openConfirm(\'Remove '+r.name+'?\',()=>delRec(\''+r.id+'\'))">&#10005;</button></div></div>').join('');
-  rtEl.innerHTML='<hr><div class="mrow"><span class="mlbl">Monthly total</span><span class="mval" style="color:var(--r4);">$'+tot.toFixed(2)+'/mo</span></div>';
+  if(!recs.length){rEl.innerHTML='<div class="empty" style="padding:12px 0 2px;"><p>No recurring payments</p></div>';}
+  else{
+    const tot=recs.reduce((s,r)=>s+r.amount,0);
+    rEl.innerHTML=recs.map(r=>'<div class="litem"><div class="lico">\uD83D\uDD01</div><div class="linf"><div class="lname">'+r.name+'</div><div class="lsub">Every month, day '+r.day+'</div></div><div class="lact"><span class="lamt">'+fmtMoney(r.amount)+'/mo</span><button class="btn bs bsm" onclick="openConfirm(\'Remove '+r.name+'?\',()=>delRec(\''+r.id+'\'))">&#10005;</button></div></div>').join('');
+  }
+  const due=recurringOccurrences(range.start,range.end),dueTotal=due.reduce((sum,r)=>sum+r.amount,0);
+  const dueLabel=moneyPeriod==='week'?'Due this week':moneyPeriod==='month'?'Due this month':'Due this year';
+  rtEl.innerHTML=(recs.length?'<hr><div class="mrow"><span class="mlbl">Monthly total</span><span class="mval" style="color:var(--r4);">'+fmtMoney(recs.reduce((sum,r)=>sum+r.amount,0))+'/mo</span></div>':'')+
+    '<div class="mrow"><span class="mlbl">'+dueLabel+'</span><span class="mval" style="color:var(--rd);">-'+fmtMoney(dueTotal)+'</span></div>'+
+    (due.length?due.map(r=>'<div class="snote">'+fmtD(r.date)+' · '+r.name+': '+fmtMoney(r.amount)+'</div>').join(''):'<div class="snote">No recurring payments due in this period.</div>');
 }
 
 // ═══ PLAN ═══
 function setPeriod(p,btn){planPeriod=p;planOffset=0;btn.closest('.piltabs').querySelectorAll('.piltab').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderPlan();}
 function shiftOff(d){planOffset+=d;if(planOffset>0)planOffset=0;renderPlan();}
+function median(values){
+  if(!values.length)return 0;
+  const a=[...values].sort((x,y)=>x-y),mid=Math.floor(a.length/2);
+  return a.length%2?a[mid]:(a[mid-1]+a[mid])/2;
+}
+function goalForecast(g){
+  const today=todayStr(),start=g.startedOn||g.historyStartedOn||today;
+  const elapsedDays=Math.max(1,(dateFromStr(today)-dateFromStr(start))/86400000);
+  const elapsedWeeks=elapsedDays/7;
+  const average=Math.max(0,g.saved)/elapsedWeeks;
+
+  // Only completed full weeks after history tracking began are used for median/best-week scenarios.
+  const historyStart=g.historyStartedOn||today;
+  let firstWeek=wkStart(historyStart);
+  if(firstWeek<historyStart)firstWeek=addDays(firstWeek,7);
+  const lastCompletedWeek=addDays(wkStart(today),-7);
+  const weeklyTotals=[];
+  for(let ws=firstWeek;ws<=lastCompletedWeek;ws=addDays(ws,7)){
+    const we=addDays(ws,6);
+    const total=goalContributions.filter(c=>c.goalId===g.id&&!c.openingBalance&&c.date>=ws&&c.date<=we).reduce((sum,c)=>sum+c.amount,0);
+    weeklyTotals.push(total);
+  }
+  const pessimistic=weeklyTotals.length?median(weeklyTotals):0;
+  const sortedWeeks=[...weeklyTotals].sort((a,b)=>a-b),mid=Math.floor(sortedWeeks.length/2);
+  const medianValues=weeklyTotals.length?(sortedWeeks.length%2?[sortedWeeks[mid]]:[sortedWeeks[mid-1],sortedWeeks[mid]]):[];
+  const bestWeeks=[...weeklyTotals].sort((a,b)=>b-a).slice(0,3);
+  const optimistic=bestWeeks.length?bestWeeks.reduce((sum,n)=>sum+n,0)/bestWeeks.length:0;
+  return{average,elapsedWeeks,pessimistic,optimistic,weeklyCount:weeklyTotals.length,bestCount:bestWeeks.length,medianValues,bestWeeks};
+}
+function forecastText(label,rate,remaining,detail){
+  if(remaining<=0)return'<div class="gforecast-row"><strong>'+label+':</strong> Goal reached</div>';
+  if(!(rate>0))return'<div class="gforecast-row"><strong>'+label+':</strong> Not enough positive weekly savings yet</div>';
+  const weeks=Math.ceil(remaining/rate);
+  return'<div class="gforecast-row"><strong>'+label+':</strong> '+fmtMoney(rate)+'/week → about '+weeks+' week'+(weeks===1?'':'s')+'</div>'+(detail?'<div class="gforecast-note">'+detail+'</div>':'');
+}
 function renderPlan(){
-  const avgPay=shts.length?allEarned()/shts.length:cfg.baseRate*7;
-  document.getElementById('goals-list').innerHTML=gols.length?gols.map(g=>{const rem=Math.max(0,g.target-g.saved),pct=Math.min(100,g.target>0?g.saved/g.target*100:0),need=avgPay>0?Math.ceil(rem/avgPay):'?';return'<div class="goalcard"><div class="gname">'+g.name+'</div><div class="gtgt">$'+g.target.toFixed(0)+'</div><div class="gsub">$'+g.saved.toFixed(2)+' saved \u00B7 $'+rem.toFixed(2)+' to go</div><div class="pbar"><div class="pfill" style="width:'+pct+'%"></div></div><div class="gfoot"><span class="gshifts">~'+need+' more shift'+(need===1?'':'s')+'</span><div style="display:flex;gap:6px;"><button class="btn bs bsm" onclick="openAddSav(\''+g.id+'\')">+ Add</button><button class="btn bs bsm" style="color:var(--rd);background:var(--rdb);" onclick="openConfirm(\'Delete goal?\',()=>delGoal(\''+g.id+'\'))">&#10005;</button></div></div></div>';}).join(''):'<div class="empty" style="padding:4px 0 12px;"><p>Add a goal to start tracking</p></div>';
+  const goalsHtml=gols.length?gols.map(g=>{
+    const rem=Math.max(0,g.target-g.saved),pct=Math.min(100,g.target>0?g.saved/g.target*100:0),f=goalForecast(g);
+    const rows=[];
+    if(!goalHistoryReady){
+      rows.push('<div class="gforecast-row"><strong>Forecasts:</strong> Apply goal_forecast_migration.sql to enable dated savings history.</div>');
+    }else{
+      if(cfg.weeklySavingsTarget>0)rows.push(forecastText('Custom target',cfg.weeklySavingsTarget,rem,'Based on the custom target set in Settings.'));
+      rows.push(forecastText('Pessimistic · median',f.pessimistic,rem,f.weeklyCount?('Median of '+f.weeklyCount+' completed tracked weeks since '+fmtD(g.historyStartedOn||todayStr())+', including zero weeks. Middle value'+(f.medianValues.length===1?'':'s')+': '+f.medianValues.map(fmtMoney).join(' and ')+'.'):'No complete tracked weeks yet; this estimate will appear after the first full week.'));
+      rows.push(forecastText('Average',f.average,rem,fmtMoney(g.saved)+' saved ÷ '+f.elapsedWeeks.toFixed(1)+' elapsed weeks = '+fmtMoney(f.average)+'/week, since '+fmtD(g.startedOn||g.historyStartedOn||todayStr())+'.'));
+      rows.push(forecastText('Optimistic · best weeks',f.optimistic,rem,f.bestCount?'Best '+f.bestCount+' of '+f.weeklyCount+' completed tracked weeks: '+f.bestWeeks.map(fmtMoney).join(' + ')+' ÷ '+f.bestCount+' = '+fmtMoney(f.optimistic)+'/week.':'No complete tracked weeks yet; this estimate will appear after the first full week.'));
+    }
+    return'<div class="goalcard"><div class="gname">'+g.name+'</div><div class="gtgt">'+fmtMoney(g.target)+'</div><div class="gsub">'+fmtMoney(g.saved)+' saved · '+fmtMoney(rem)+' to go</div><div class="pbar"><div class="pfill" style="width:'+pct+'%"></div></div><div class="gforecast">'+rows.join('')+'</div><div class="gfoot"><span class="gshifts">'+(rem<=0?'Completed':'Forecasts are estimates')+'</span><div style="display:flex;gap:6px;"><button class="btn bs bsm" onclick="openAddSav(\''+g.id+'\')">+ Add</button><button class="btn bs bsm" style="color:var(--rd);background:var(--rdb);" onclick="openConfirm(\'Delete goal?\',()=>delGoal(\''+g.id+'\'))">&#10005;</button></div></div></div>';
+  }).join(''):'<div class="empty" style="padding:4px 0 12px;"><p>Add a goal to start tracking</p></div>';
+  document.getElementById('goals-list').innerHTML=goalsHtml;
+
   const range=getPeriodRange(planPeriod,planOffset);
   document.getElementById('pn-lbl').textContent=range.label;
   document.getElementById('pn-next').style.opacity=planOffset>=0?'0.3':'1';
   document.getElementById('pn-next').style.pointerEvents=planOffset>=0?'none':'auto';
   const pShifts=shts.filter(s=>s.date>=range.start&&s.date<=range.end);
   const pExps=exps.filter(e=>e.date>=range.start&&e.date<=range.end);
+  const pRecurring=recurringOccurrences(range.start,range.end);
   const oEl=document.getElementById('plan-ov');
-  if(!pShifts.length&&!pExps.length){oEl.innerHTML='<p style="font-size:.8rem;color:var(--mt);font-weight:500;">No data for this period yet.</p>';return;}
+  if(!pShifts.length&&!pExps.length&&!pRecurring.length){oEl.innerHTML='<p style="font-size:.8rem;color:var(--mt);font-weight:500;">No data for this period yet.</p>';return;}
   const wMap={};pShifts.forEach(s=>{const ws=getPayPeriodStart(s.date);(wMap[ws]=wMap[ws]||[]).push(s);});
   const pEarned=Object.values(wMap).reduce((sum,ws)=>sum+calcWk(ws).earned,0);
-  const pExpTotal=pExps.reduce((s,e)=>s+e.amount,0),recMo=recs.reduce((s,r)=>s+r.amount,0);
-  const recForCalc=planPeriod==='month'?recMo:planPeriod==='year'?recMo*12:0,taxSet=(cfg.taxRate||0)>0;
-  const netAfter=pEarned-pExpTotal-recForCalc;
+  const pExpTotal=pExps.reduce((s,e)=>s+e.amount,0),recTotal=pRecurring.reduce((s,r)=>s+r.amount,0),taxSet=(cfg.taxRate||0)>0;
+  const netAfter=pEarned-pExpTotal-recTotal;
   const catMap=Object.fromEntries(cats.map(c=>[c.id,c]));
-  const expDetail=pExps.length?pExps.map(e=>{const c=catMap[e.catId]||{emoji:'\uD83D\uDCE6'};return c.emoji+' '+e.name+': $'+e.amount.toFixed(2);}).join(' \u00B7 '):'';
-  let recLine='';
-  if(recs.length){if(planPeriod==='week')recLine='<div class="snote">Monthly fixed costs (ref): $'+recMo.toFixed(2)+'/mo</div>';else if(planPeriod==='month')recLine='<div class="mrow"><span class="mlbl">Recurring</span><span class="mval" style="color:var(--rd);">-$'+recMo.toFixed(2)+'</span></div>';else recLine='<div class="mrow"><span class="mlbl">Recurring (year)</span><span class="mval" style="color:var(--rd);">-$'+(recMo*12).toFixed(2)+'</span></div>';}
-  oEl.innerHTML='<div class="mrow"><span class="mlbl">Earned</span><span class="mval" style="color:var(--gn);">+$'+pEarned.toFixed(2)+'</span></div>'+(pExpTotal>0?'<div class="mrow"><span class="mlbl">Expenses ('+pExps.length+')</span><span class="mval" style="color:var(--rd);">-$'+pExpTotal.toFixed(2)+'</span></div>'+(expDetail?'<div class="snote">'+expDetail+'</div>':''):'')+ recLine+((pExpTotal>0||recForCalc>0)?'<div class="mrow" style="border-top:1px solid var(--bd);margin-top:4px;padding-top:10px;"><span style="font-weight:700;font-size:.87rem;">Net</span><span style="font-weight:800;font-size:1.05rem;color:'+(netAfter>=0?'var(--gn)':'var(--rd)')+';">$'+netAfter.toFixed(2)+'</span></div>':'')+(taxSet?'<div class="mrow"><span style="font-weight:700;font-size:.87rem;">Est. take-home</span><span style="font-weight:800;font-size:1.05rem;color:var(--gn);">$'+Math.max(0,netOf(pEarned)-pExpTotal-recForCalc).toFixed(2)+'</span></div>':'');
+  const expDetail=pExps.length?pExps.map(e=>{const c=catMap[e.catId]||{emoji:'\uD83D\uDCE6'};return c.emoji+' '+e.name+': '+fmtMoney(e.amount);}).join(' · '):'';
+  const recDetail=pRecurring.map(r=>fmtD(r.date)+' · '+r.name+': '+fmtMoney(r.amount)).join(' · ');
+  const netNeeded=pExpTotal>0||recTotal>0;
+  oEl.innerHTML='<div class="mrow"><span class="mlbl">Earned</span><span class="mval" style="color:var(--gn);">+'+fmtMoney(pEarned)+'</span></div>'+
+    (pExpTotal>0?'<div class="mrow"><span class="mlbl">Regular expenses ('+pExps.length+')</span><span class="mval" style="color:var(--rd);">-'+fmtMoney(pExpTotal)+'</span></div>'+(expDetail?'<div class="snote">'+expDetail+'</div>':''):'')+
+    (recTotal>0?'<div class="mrow"><span class="mlbl">Recurring payments ('+pRecurring.length+')</span><span class="mval" style="color:var(--rd);">-'+fmtMoney(recTotal)+'</span></div><div class="snote">'+recDetail+'</div>':'')+
+    (netNeeded?'<div class="mrow" style="border-top:1px solid var(--bd);margin-top:4px;padding-top:10px;"><span style="font-weight:700;font-size:.87rem;">Net</span><span style="font-weight:800;font-size:1.05rem;color:'+(netAfter>=0?'var(--gn)':'var(--rd)')+';">'+fmtMoney(netAfter)+'</span></div>':'')+
+    (taxSet?'<div class="mrow"><span style="font-weight:700;font-size:.87rem;">Est. take-home</span><span style="font-weight:800;font-size:1.05rem;color:var(--gn);">'+fmtMoney(Math.max(0,netOf(pEarned)-pExpTotal-recTotal))+'</span></div>':'');
 }
 
 // ═══ SETTINGS ═══
 function renderSettings(){
-  document.getElementById('s-base').value=cfg.baseRate;document.getElementById('s-thr').value=cfg.otThreshold;document.getElementById('s-ot').value=cfg.otRate;document.getElementById('s-tax').value=cfg.taxRate||0;document.getElementById('s-wk').value=cfg.weekStartDay;document.getElementById('s-ow').value=cfg.startingOwed||0;document.getElementById('s-brk').value=cfg.breakMinutes||30;
+  document.getElementById('s-base').value=cfg.baseRate;document.getElementById('s-thr').value=cfg.otThreshold;document.getElementById('s-ot').value=cfg.otRate;document.getElementById('s-tax').value=cfg.taxRate||0;document.getElementById('s-wk').value=cfg.weekStartDay;document.getElementById('s-ow').value=cfg.startingOwed||0;document.getElementById('s-brk').value=cfg.breakMinutes||30;document.getElementById('s-weekly-savings').value=cfg.weeklySavingsTarget||0;
   renderCats();updateBreakLabels();
 }
 async function saveCfg(){
-  const br=parseFloat(document.getElementById('s-base').value),thr=parseFloat(document.getElementById('s-thr').value),ot=parseFloat(document.getElementById('s-ot').value),tax=parseFloat(document.getElementById('s-tax').value)||0,ws=parseInt(document.getElementById('s-wk').value),so=parseFloat(document.getElementById('s-ow').value)||0,brk=parseInt(document.getElementById('s-brk').value)||30;
+  const br=parseFloat(document.getElementById('s-base').value),thr=parseFloat(document.getElementById('s-thr').value),ot=parseFloat(document.getElementById('s-ot').value),tax=parseFloat(document.getElementById('s-tax').value)||0,ws=parseInt(document.getElementById('s-wk').value),so=parseFloat(document.getElementById('s-ow').value)||0,brk=parseInt(document.getElementById('s-brk').value)||30,weeklySavingsTarget=parseFloat(document.getElementById('s-weekly-savings').value)||0;
   if(isNaN(br)||isNaN(thr)||isNaN(ot)){toast('Fill in all rate fields');return;}
-  cfg={...cfg,baseRate:br,otThreshold:thr,otRate:ot,taxRate:tax,weekStartDay:ws,startingOwed:so,breakMinutes:brk};
+  if(weeklySavingsTarget<0){toast('Custom weekly savings target cannot be negative');return;}
+  cfg={...cfg,baseRate:br,otThreshold:thr,otRate:ot,taxRate:tax,weekStartDay:ws,startingOwed:so,breakMinutes:brk,weeklySavingsTarget};
   updateBreakLabels();
-  try{await sb.from('user_settings').upsert({user_id:user.id,base_rate:br,ot_rate:ot,ot_threshold:thr,week_start_day:ws,starting_owed:so,tax_rate:tax,break_minutes:brk,categories:cats},{onConflict:'user_id'});toast('Settings saved \u2713');}
+  try{await sb.from('user_settings').upsert({user_id:user.id,base_rate:br,ot_rate:ot,ot_threshold:thr,week_start_day:ws,starting_owed:so,tax_rate:tax,break_minutes:brk,weekly_savings_target:weeklySavingsTarget,categories:cats},{onConflict:'user_id'});toast('Settings saved \u2713');renderPlan();}
   catch(e){toast('Error: '+e.message);}
 }
 function renderCats(){document.getElementById('cats-list').innerHTML=cats.map(c=>'<div class="litem"><div class="lico">'+c.emoji+'</div><div class="linf"><div class="lname">'+c.name+'</div></div><button class="btn bs bsm" style="color:var(--rd);background:var(--rdb);" onclick="openConfirm(\'Delete category?\',()=>delCat(\''+c.id+'\'))">&#10005;</button></div>').join('');}
@@ -841,18 +956,38 @@ async function delRec(id){try{await dbDel('recurring',id);recs=recs.filter(r=>r.
 
 function openGoalSh(){['sg-nm','sg-tg','sg-sv'].forEach(x=>document.getElementById(x).value='');setBusy('sg-save',false,'Add');op('sh-goal');}
 async function saveGoal(){
+  if(!goalHistoryReady){toast('Run goal_forecast_migration.sql in Supabase first');return;}
   const nm=document.getElementById('sg-nm').value.trim(),tg=parseFloat(document.getElementById('sg-tg').value),sv=parseFloat(document.getElementById('sg-sv').value)||0;
   if(!nm||isNaN(tg)||tg<=0){toast('Enter name and target');return;}
   setBusy('sg-save',true,'Add');
-  try{const row=await dbIns('goals',{name:nm,target:tg,saved:sv});gols.push({id:row.id,name:nm,target:tg,saved:sv});cl('sh-goal');toast('Goal added \u2713');renderPlan();}
+  try{
+    const today=todayStr();
+    const row=await dbIns('goals',{name:nm,target:tg,saved:sv,started_on:today,history_started_on:today});
+    let opening=null;
+    if(sv>0){
+      try{opening=await dbIns('goal_contributions',{goal_id:row.id,amount:sv,contribution_date:today,is_opening_balance:true});}
+      catch(err){await dbDel('goals',row.id);throw err;}
+    }
+    gols.push({id:row.id,name:nm,target:tg,saved:sv,startedOn:row.started_on||today,historyStartedOn:row.history_started_on||today});
+    if(opening)goalContributions.push({id:opening.id,goalId:row.id,amount:sv,date:today,openingBalance:true,createdAt:opening.created_at});
+    cl('sh-goal');toast('Goal added ✓');renderPlan();
+  }
   catch(e){toast('Error: '+e.message);}finally{setBusy('sg-save',false,'Add');}
 }
 function openAddSav(id){_gid=id;document.getElementById('sas-am').value='';op('sh-addsav');}
 async function doAddSav(){
+  if(!goalHistoryReady){toast('Run goal_forecast_migration.sql in Supabase first');return;}
   const am=parseFloat(document.getElementById('sas-am').value);if(isNaN(am)||am<=0){toast('Enter an amount');return;}
-  const g=gols.find(x=>x.id===_gid);if(!g)return;const nv=Math.min(g.target,g.saved+am);
-  try{await dbUpd('goals',_gid,{saved:nv});g.saved=nv;cl('sh-addsav');toast('Savings updated \u2713');renderPlan();}
-  catch(e){toast('Error: '+e.message);}
+  const g=gols.find(x=>x.id===_gid);if(!g)return;const added=Math.min(am,Math.max(0,g.target-g.saved)),nv=g.saved+added;
+  if(added<=0){toast('This goal is already complete');return;}
+  let contribution=null;
+  try{
+    contribution=await dbIns('goal_contributions',{goal_id:_gid,amount:added,contribution_date:todayStr(),is_opening_balance:false});
+    try{await dbUpd('goals',_gid,{saved:nv});}
+    catch(err){await dbDel('goal_contributions',contribution.id);throw err;}
+    g.saved=nv;goalContributions.push({id:contribution.id,goalId:_gid,amount:added,date:contribution.contribution_date||todayStr(),openingBalance:false,createdAt:contribution.created_at});
+    cl('sh-addsav');toast('Savings updated ✓');renderPlan();
+  }catch(e){toast('Error: '+e.message);}
 }
 async function delGoal(id){try{await dbDel('goals',id);gols=gols.filter(g=>g.id!==id);renderPlan();}catch(e){toast('Error: '+e.message);}}
 
