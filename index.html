@@ -45,9 +45,12 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);c
 .sv.a{color:var(--am);}.sv.g{color:var(--gn);}.sv.m{color:var(--mt);}
 .sl{font-size:.7rem;color:var(--mt);font-weight:600;margin-top:4px;}
 .sl.tap-hint::after{content:' ›';color:var(--r4);}
-.takehome{background:var(--gnb);border-radius:12px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
+.takehome{background:var(--gnb);border-radius:12px;padding:10px 14px;margin-bottom:0;display:flex;justify-content:space-between;align-items:center;width:100%;border:0;text-align:left;cursor:pointer;font-family:inherit;}
 .th-l{font-size:.78rem;color:var(--gn);font-weight:600;}
 .th-v{font-size:1rem;font-weight:800;color:var(--gn);}
+.th-detail{background:var(--sf);border:1px solid var(--bd);border-top:0;border-radius:0 0 12px 12px;padding:9px 13px;margin-bottom:0;font-size:.7rem;line-height:1.5;color:var(--mt);}
+.takehome[aria-expanded="true"] .gforecast-arrow{transform:rotate(180deg);}
+.th-detail[hidden]{display:none;}
 .fg{margin-bottom:12px;}
 .fg label{display:block;font-size:.74rem;font-weight:700;color:var(--mt);margin-bottom:5px;}
 input,select{width:100%;padding:11px 13px;border:1.5px solid var(--bd);border-radius:10px;font-size:.95rem;font-family:inherit;color:var(--tx);background:var(--sf2);outline:none;transition:border-color .15s,background .15s;-webkit-appearance:none;appearance:none;}
@@ -82,7 +85,18 @@ input:focus,select:focus{border-color:var(--r4);background:#fff;}
 .obanner{background:linear-gradient(135deg,var(--r4),var(--r6));color:#fff;border-radius:var(--rr);padding:20px 18px;margin-bottom:10px;}
 .olbl{font-size:.74rem;font-weight:600;opacity:.85;margin-bottom:4px;}
 .oamt{font-size:2.4rem;font-weight:800;letter-spacing:-.04em;line-height:1;}
-.osub{font-size:.71rem;opacity:.75;font-weight:500;margin-top:6px;}
+.osub{margin-top:10px;display:grid;gap:2px;}
+.owe-main-tap{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;border:0;background:transparent;color:#fff;text-align:left;cursor:pointer;font-family:inherit;}
+.owe-main-tap .oamt{flex:1;}
+.owe-arrow{font-size:.9rem;opacity:.8;transition:transform .15s;}
+.owe-main-tap[aria-expanded="true"] .owe-arrow,.owe-metric[aria-expanded="true"] .owe-arrow{transform:rotate(180deg);}
+.owe-detail{font-size:.7rem;line-height:1.5;color:rgba(255,255,255,.84);padding:7px 0 9px;border-top:1px solid rgba(255,255,255,.2);margin-top:5px;}
+.owe-detail[hidden]{display:none;}
+.owe-metric{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;padding:6px 0;border:0;border-top:1px solid rgba(255,255,255,.16);background:transparent;color:#fff;text-align:left;font:inherit;font-size:.72rem;cursor:pointer;}
+.owe-metric-label{font-weight:600;opacity:.85;}
+.owe-metric-value{font-weight:800;white-space:nowrap;}
+.owe-metric-detail{font-size:.68rem;line-height:1.5;color:rgba(255,255,255,.78);padding:2px 0 8px;}
+.owe-metric-detail[hidden]{display:none;}
 .goalcard{background:linear-gradient(135deg,#FFE6EF,#FFCEDD);border-radius:var(--rr);padding:16px;margin-bottom:10px;border:1px solid var(--r2);}
 .gname{font-size:.71rem;font-weight:700;color:var(--r6);letter-spacing:.03em;margin-bottom:2px;}
 .gtgt{font-size:1.7rem;font-weight:800;color:var(--tx);letter-spacing:-.03em;line-height:1.1;}
@@ -109,6 +123,7 @@ input:focus,select:focus{border-color:var(--r4);background:#fff;}
 .plan-line-main{min-width:0;flex:1;}
 .plan-line-sub{display:block;font-size:.67rem;color:var(--mt);margin-top:2px;}
 .plan-line-amt{white-space:nowrap;font-weight:700;color:var(--tx);}
+.saveup-edit{padding:5px 9px;font-size:.68rem;}
 .mrow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bd);}
 .mrow:last-child{border-bottom:none;}
 .mlbl{font-size:.83rem;color:var(--mt);font-weight:500;}
@@ -203,8 +218,11 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
       <div class="stat"><div class="sv a" id="wo">0.0</div><div class="sl">OT hours</div></div>
       <div class="stat"><div class="sv m" id="wu">40.0</div><div class="sl">hrs until OT</div></div>
     </div>
-    <div id="th-row" style="display:none;" class="takehome">
-      <span class="th-l">✿ Est. take-home after tax</span><span class="th-v" id="th-v">$0.00</span>
+    <div id="th-wrap" style="display:none;margin-bottom:10px;">
+      <button type="button" id="th-row" class="takehome" aria-expanded="false" aria-controls="th-detail" onclick="toggleInlineDetail('th-detail',this)">
+        <span class="th-l">✿ Est. take-home after tax</span><span class="th-v" id="th-v">$0.00</span><span class="gforecast-arrow">⌄</span>
+      </button>
+      <div class="th-detail" id="th-detail" hidden></div>
     </div>
     <div class="card" id="td-logged" style="display:none;">
       <div class="row"><span class="ctitle" style="margin:0;">Today's shift</span><button class="btn bs bsm" onclick="editToday()">Edit</button></div>
@@ -232,7 +250,10 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
   <div class="page" id="page-money">
     <div class="obanner">
       <div class="olbl">💰 Employer owes you (gross running total)</div>
-      <div class="oamt" id="o-amt">$0.00</div>
+      <button type="button" class="owe-main-tap" id="owed-toggle" aria-expanded="false" aria-controls="owed-detail" onclick="toggleInlineDetail('owed-detail',this)">
+        <span class="oamt" id="o-amt">$0.00</span><span class="owe-arrow">⌄</span>
+      </button>
+      <div class="owe-detail" id="owed-detail" hidden></div>
       <div class="osub" id="o-sub"></div>
     </div>
     <div class="card">
@@ -412,6 +433,14 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0;}
   <div class="brow"><button class="btn bs" onclick="cl('sh-addsav')">Cancel</button><button class="btn bp" onclick="doAddSav()">Add</button></div>
 </div></div>
 
+<div class="overlay" id="sh-editsav" onclick="oc(this)"><div class="sheet">
+  <div class="spull"></div><div class="stitle">Edit Save Up</div>
+  <div class="fg"><label>Amount ($)</label><input type="number" id="esu-am" step="0.01" min="0.01"></div>
+  <div class="fg"><label>Date saved</label><input type="date" id="esu-date"></div>
+  <div class="fg"><label>Assigned goal</label><select id="esu-goal"></select></div>
+  <div class="brow"><button class="btn bs" onclick="cl('sh-editsav')">Cancel</button><button class="btn bp" id="esu-save" onclick="saveEditSav()">Save</button></div>
+</div></div>
+
 <div class="overlay" id="sh-cat" onclick="oc(this)"><div class="sheet">
   <div class="spull"></div><div class="stitle">Add category</div>
   <div class="fg"><label>Name</label><input type="text" id="sc-nm" placeholder="e.g. Hair"></div>
@@ -442,7 +471,7 @@ let cfg={baseRate:18,otRate:27,otThreshold:40,weekStartDay:4,startingOwed:0,taxR
 const DEF_CATS=[{id:'rent',name:'Rent',emoji:'\uD83C\uDFE0'},{id:'spending',name:'Spending money',emoji:'\uD83D\uDCB3'},{id:'other',name:'Other',emoji:'\uD83D\uDCE6'}];
 let cats=[...DEF_CATS],shts=[],exps=[],recs=[],pays=[],gols=[],goalContributions=[],weekOverrides=[],goalHistoryReady=false;
 let cur='today',planPeriod='week',planOffset=0,moneyPeriod='week',moneyOffset=0;
-let _eid=null,_gid=null,_lastRecurringSyncDate='';
+let _eid=null,_gid=null,_contributionId=null,_lastRecurringSyncDate='';
 
 // ═══ BOOT ═══
 document.addEventListener('DOMContentLoaded',()=>{
@@ -515,7 +544,7 @@ async function loadAll(){
     exps=(b.data||[]).map(r=>({id:r.id,name:r.name,amount:+r.amount,catId:r.cat_id,date:r.date,recurringId:r.recurring_id||null,recurringOccurrenceDate:r.recurring_occurrence_date||null}));
     recs=(c.data||[]).map(r=>({id:r.id,name:r.name,amount:+r.amount,day:r.day_of_month,startedOn:r.started_on||todayStr(),endedOn:r.ended_on||null,createdAt:r.created_at||null}));
     pays=(d.data||[]).map(r=>({id:r.id,amount:+r.amount,date:r.date,note:r.note||''}));
-    gols=(e.data||[]).map(r=>({id:r.id,name:r.name,target:+r.target,saved:+r.saved,startedOn:r.started_on||todayStr(),historyStartedOn:r.history_started_on||todayStr()}));
+    gols=(e.data||[]).map(r=>({id:r.id,name:r.name,target:+r.target,saved:+r.saved,startedOn:r.started_on||todayStr(),historyStartedOn:r.history_started_on||todayStr(),createdAt:r.created_at||null}));
     goalHistoryReady=!h.error;
     goalContributions=(h.data||[]).map(r=>({id:r.id,goalId:r.goal_id,amount:+r.amount,date:r.contribution_date,openingBalance:!!r.is_opening_balance,createdAt:r.created_at}));
     weekOverrides=(g.data||[]).map(r=>({id:r.id,weekStart:r.week_start,daysCut:r.days_cut}));
@@ -548,6 +577,7 @@ let _ic=0;
 function uid(){return Date.now().toString(36)+(++_ic).toString(36);}
 function pad(n){return String(n).padStart(2,'0');}
 function todayStr(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 function dateFromStr(ds){const[y,m,d]=String(ds).split('-').map(Number);return new Date(Date.UTC(y,m-1,d));}
 function dateToStr(d){return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate());}
 function addDays(ds,days){const d=dateFromStr(ds);d.setUTCDate(d.getUTCDate()+days);return dateToStr(d);}
@@ -652,8 +682,13 @@ function renderToday(){
   document.getElementById('wg').textContent=fmtMoney(earned);
   document.getElementById('wo').textContent=ot.toFixed(1);
   document.getElementById('wu').textContent=toOT>0?toOT.toFixed(1):'\u2014';
-  const taxSet=(cfg.taxRate||0)>0,thr=document.getElementById('th-row');
-  if(taxSet&&earned>0){thr.style.display='flex';document.getElementById('th-v').textContent=fmtMoney(netOf(earned))+' ('+cfg.taxRate+'% off)';}else{thr.style.display='none';}
+  const taxSet=(cfg.taxRate||0)>0,thWrap=document.getElementById('th-wrap'),thRow=document.getElementById('th-row'),thDetail=document.getElementById('th-detail');
+  if(taxSet&&earned>0){
+    thWrap.style.display='block';
+    document.getElementById('th-v').textContent=fmtMoney(netOf(earned));
+    thDetail.textContent=fmtMoney(earned)+' gross this week − '+cfg.taxRate+'% estimated deductions ('+fmtMoney(earned-netOf(earned))+') = '+fmtMoney(netOf(earned))+' estimated take-home.';
+    thDetail.hidden=true;thRow.setAttribute('aria-expanded','false');
+  }else{thWrap.style.display='none';}
   const ex=shts.find(s=>s.date===ds);
   document.getElementById('td-logged').style.display=ex?'block':'none';
   document.getElementById('td-form').style.display=ex?'none':'block';
@@ -870,8 +905,15 @@ function setMoneyPeriod(p,btn){moneyPeriod=p;moneyOffset=0;btn.closest('.piltabs
 function shiftMoneyOff(d){moneyOffset+=d;if(moneyOffset>0)moneyOffset=0;renderMoney();}
 function renderMoney(){
   const o=owed(),earned=allEarned(),paid=totalPaid(),taxSet=(cfg.taxRate||0)>0;
+  const shiftsCount=shts.length,payPeriods=new Set(shts.map(s=>getPayPeriodStart(s.date))).size;
+  const owesDetail=(cfg.startingOwed||0)>0?fmtMoney(cfg.startingOwed)+' starting balance + ':' ';
   document.getElementById('o-amt').textContent=fmtMoney(o);
-  document.getElementById('o-sub').textContent=fmtMoney(earned)+' earned \u00B7 '+fmtMoney(paid)+' received'+(taxSet?' \u00B7 est. take-home '+fmtMoney(netOf(o)):'');
+  document.getElementById('owed-detail').textContent=owesDetail+fmtMoney(earned)+' earned − '+fmtMoney(paid)+' received = '+fmtMoney(o)+' (minimum $0.00).';
+  const owedToggle=document.getElementById('owed-toggle');owedToggle.setAttribute('aria-expanded','false');document.getElementById('owed-detail').hidden=true;
+  const metric=(id,label,value,detail)=>'<button type="button" class="owe-metric" aria-expanded="false" aria-controls="'+id+'" onclick="toggleInlineDetail(\''+id+'\',this)"><span class="owe-metric-label">'+label+'</span><span class="owe-metric-value">'+value+'</span><span class="owe-arrow">⌄</span></button><div class="owe-metric-detail" id="'+id+'" hidden>'+detail+'</div>';
+  document.getElementById('o-sub').innerHTML=metric('earned-detail','Earned',fmtMoney(earned),'Gross pay from '+shiftsCount+' logged shifts across '+payPeriods+' pay periods, calculated using each shift’s saved hourly rates and overtime rules.')+
+    metric('received-detail','Received',fmtMoney(paid),fmtMoney(paid)+' is the sum of '+pays.length+' recorded payment'+(pays.length===1?'':'s')+'.')+
+    (taxSet?metric('takehome-money-detail','Est. take-home',fmtMoney(netOf(o)),fmtMoney(o)+' outstanding × (100% − '+cfg.taxRate+'% deductions) = '+fmtMoney(netOf(o))+'.'):'');
   const range=getPeriodRange(moneyPeriod,moneyOffset);
   document.getElementById('mn-lbl').textContent=range.label;
   document.getElementById('mn-next').style.opacity=moneyOffset>=0?'0.3':'1';
@@ -941,6 +983,11 @@ function forecastShiftDetail(remaining,rate,forecast){
   if(!(forecast&&forecast.shiftsPerWeek>0))return' Shift count unavailable: no shifts logged since this goal started, so the estimate is shown in weeks.';
   return' Shift estimate: '+forecast.shiftsSinceStart+' logged shifts ÷ '+forecast.shiftWeeks.toFixed(1)+' weeks = '+forecast.shiftsPerWeek.toFixed(2)+' shifts/week; '+weeks+' weeks × '+forecast.shiftsPerWeek.toFixed(2)+' ≈ '+Math.ceil(weeks*forecast.shiftsPerWeek)+' shifts.';
 }
+function toggleInlineDetail(id,btn){
+  const el=document.getElementById(id);if(!el)return;
+  const opening=el.hidden;el.hidden=!opening;
+  if(btn){btn.setAttribute('aria-expanded',String(opening));const arrow=btn.querySelector('.gforecast-arrow,.owe-arrow');if(arrow)arrow.textContent=opening?'⌃':'⌄';}
+}
 function toggleForecastDetail(id,btn){
   const el=document.getElementById(id);if(!el)return;
   const opening=el.hidden;el.hidden=!opening;
@@ -954,14 +1001,9 @@ function togglePlanBreakdown(id,btn){
 function forecastText(goalId,index,label,rate,remaining,detail,forecast,preliminary){
   if(remaining<=0)return'<div class="gforecast-row"><strong>'+label+':</strong> Goal reached</div>';
   const detailId='gfd-'+goalId+'-'+index;
-  let headline;
-  if(!(rate>0))headline='Not enough weekly savings';
-  else{
-    const weeks=Math.ceil(remaining/rate);
-    const shifts=forecast&&forecast.shiftsPerWeek>0?Math.ceil(weeks*forecast.shiftsPerWeek):0;
-    headline=shifts>0?'≈'+shifts+' shifts left if putting '+fmtMoney(rate)+' weekly':weeks+' weeks left if putting '+fmtMoney(rate)+' weekly';
-  }
-  return'<div class="gforecast-row"><button type="button" class="gforecast-toggle" aria-expanded="false" aria-controls="'+detailId+'" onclick="toggleForecastDetail(\''+detailId+'\',this)"><span><strong>'+label+':</strong> '+headline+(preliminary?'<span class="gforecast-status">Preliminary</span>':'')+'</span><span class="gforecast-arrow">⌄</span></button><div class="gforecast-note" id="'+detailId+'" hidden>'+(detail||'')+'</div></div>';
+  const headline=rate>0?fmtMoney(rate)+'/w ≈ '+Math.ceil(remaining/rate)+' weeks':'Not enough weekly savings';
+  const note=(preliminary?'<strong>Preliminary.</strong> Fewer than 4 completed weeks are available. ':'')+(detail||'');
+  return'<div class="gforecast-row"><button type="button" class="gforecast-toggle" aria-expanded="false" aria-controls="'+detailId+'" onclick="toggleForecastDetail(\''+detailId+'\',this)"><span><strong>'+label+':</strong> '+headline+'</span><span class="gforecast-arrow">⌄</span></button><div class="gforecast-note" id="'+detailId+'" hidden>'+note+'</div></div>';
 }
 function renderPlan(){
   const goalsHtml=gols.length?gols.map(g=>{
@@ -973,21 +1015,21 @@ function renderPlan(){
       if(cfg.weeklySavingsTarget>0){
         const weeks=rem>0?Math.ceil(rem/cfg.weeklySavingsTarget):0;
         const customDetail='Custom weekly target from Settings: '+fmtMoney(cfg.weeklySavingsTarget)+'/week. '+fmtMoney(rem)+' remaining ÷ '+fmtMoney(cfg.weeklySavingsTarget)+'/week = '+weeks+' weeks.'+forecastShiftDetail(rem,cfg.weeklySavingsTarget,f);
-        rows.push(forecastText(g.id,0,'Custom target',cfg.weeklySavingsTarget,rem,customDetail,f,false));
+        rows.push(forecastText(g.id,0,'Custom',cfg.weeklySavingsTarget,rem,customDetail,f,false));
       }
       if(f.weeklyCount===0){
         rows.push('<div class="gforecast-row">Not enough weeks to calculate weekly-history forecasts.</div>');
       }else{
         const preliminary=f.weeklyCount<4;
         if(f.weeklyCount>=2){
-          const medDetail='Median of '+f.weeklyCount+' completed tracked weeks since '+fmtD(g.historyStartedOn||todayStr())+', including zero weeks. Middle value'+(f.medianValues.length===1?'':'s')+': '+f.medianValues.map(fmtMoney).join(' and ')+'.'+(preliminary?' Preliminary result: fewer than 4 completed weeks are available.':'')+forecastShiftDetail(rem,f.pessimistic,f);
-          rows.push(forecastText(g.id,1,'Pessimistic · median',f.pessimistic,rem,medDetail,f,preliminary));
+          const medDetail='Median of '+f.weeklyCount+' completed tracked weeks since '+fmtD(g.historyStartedOn||todayStr())+', including zero weeks. Middle value'+(f.medianValues.length===1?'':'s')+': '+f.medianValues.map(fmtMoney).join(' and ')+'.'+forecastShiftDetail(rem,f.pessimistic,f);
+          rows.push(forecastText(g.id,1,'Pessimistic',f.pessimistic,rem,medDetail,f,preliminary));
         }
         const avgDetail=fmtMoney(g.saved)+' saved ÷ '+f.elapsedWeeks.toFixed(1)+' elapsed weeks = '+fmtMoney(f.average)+'/week, since '+fmtD(g.startedOn||g.historyStartedOn||todayStr())+'.'+forecastShiftDetail(rem,f.average,f);
-        rows.push(forecastText(g.id,2,'Average',f.average,rem,avgDetail,f,preliminary&&f.weeklyCount>=2));
+        rows.push(forecastText(g.id,2,'Average',f.average,rem,avgDetail,f,preliminary));
         if(f.weeklyCount>=2){
-          const bestDetail='Average of the '+f.bestCount+' highest completed weeks out of '+f.weeklyCount+': '+f.bestWeeks.map(fmtMoney).join(' + ')+' ÷ '+f.bestCount+' = '+fmtMoney(f.optimistic)+'/week.'+(preliminary?' Preliminary result: fewer than 4 completed weeks are available.':'')+forecastShiftDetail(rem,f.optimistic,f);
-          rows.push(forecastText(g.id,3,'Optimistic · best weeks',f.optimistic,rem,bestDetail,f,preliminary));
+          const bestDetail='Average of the '+f.bestCount+' highest completed weeks out of '+f.weeklyCount+': '+f.bestWeeks.map(fmtMoney).join(' + ')+' ÷ '+f.bestCount+' = '+fmtMoney(f.optimistic)+'/week.'+forecastShiftDetail(rem,f.optimistic,f);
+          rows.push(forecastText(g.id,3,'Optimistic',f.optimistic,rem,bestDetail,f,preliminary));
         }
       }
     }
@@ -1003,7 +1045,7 @@ function renderPlan(){
   const pExps=exps.filter(e=>!e.recurringId&&expenseDate(e)>=range.start&&expenseDate(e)<=range.end);
   const pRecurring=regularOccurrencesForPeriod(range.start,range.end);
   const pRecurringGroups=regularDisplayGroups(pRecurring,planPeriod==='year');
-  const pContributions=goalContributions.filter(c=>!c.openingBalance&&c.date>=range.start&&c.date<=range.end);
+  const pContributions=goalContributions.filter(c=>!c.openingBalance&&c.date>=range.start&&c.date<=range.end).sort((a,b)=>b.date.localeCompare(a.date)||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   const oEl=document.getElementById('plan-ov');
   if(!pShifts.length&&!pExps.length&&!pRecurring.length&&!pContributions.length){oEl.innerHTML='<p style="font-size:.8rem;color:var(--mt);font-weight:500;">No data for this period yet.</p>';return;}
   const wMap={};pShifts.forEach(s=>{const ws=getPayPeriodStart(s.date);(wMap[ws]=wMap[ws]||[]).push(s);});
@@ -1016,13 +1058,14 @@ function renderPlan(){
   const catMap=Object.fromEntries(cats.map(c=>[c.id,c]));
   const expDetail=pExps.map(e=>{const c=catMap[e.catId]||{emoji:'📦',name:'Other'},dt=expenseDate(e);return'<div class="plan-line"><span class="plan-line-main">'+c.emoji+' '+e.name+'<span class="plan-line-sub">'+c.name+' · '+fmtD(dt)+'</span></span><span class="plan-line-amt">-'+fmtMoney(e.amount)+'</span></div>';}).join('');
   const recDetail=pRecurringGroups.map(r=>{const dateLabel=planPeriod==='year'?(r.count>1?fmtD(r.firstDate)+' – '+fmtD(r.lastDate):fmtD(r.date)):(fmtD(r.date)+(r.actual?'':' · Upcoming'));const countLabel=planPeriod==='year'&&r.count>1?' ('+r.count+' times)':'';return'<div class="plan-line"><span class="plan-line-main">'+r.name+countLabel+'<span class="plan-line-sub">Regular Expense · '+dateLabel+'</span></span><span class="plan-line-amt">-'+fmtMoney(planPeriod==='year'?r.total:r.amount)+'</span></div>';}).join('');
+  const saveUpDetail=pContributions.map(c=>{const goal=gols.find(g=>g.id===c.goalId),goalLabel=goal?'For '+escapeHtml(goal.name):'No goal assigned';return'<div class="plan-line"><span class="plan-line-main"><strong>'+fmtD(c.date)+'</strong><span class="plan-line-sub">'+goalLabel+'</span></span><span style="display:flex;align-items:center;gap:7px;white-space:nowrap;"><span class="plan-line-amt" style="color:var(--gn);">-'+fmtMoney(c.amount)+'</span><button type="button" class="btn bs bsm saveup-edit" onclick="openEditSav(\''+c.id+'\')">Edit</button></span></div>';}).join('');
   const hasGoals=gols.length>0||pContributions.length>0;
   oEl.innerHTML=(pShifts.length||pEarned>0?'<div class="mrow"><span class="mlbl">Earned</span><span class="mval" style="color:var(--gn);">+'+fmtMoney(pEarned)+'</span></div>':'')+
     (pExpTotal>0?'<button type="button" class="mrow mrow-disclosure" aria-expanded="false" aria-controls="plan-exp-detail" onclick="togglePlanBreakdown(\'plan-exp-detail\',this)"><span class="mlbl">Expenses ('+pExps.length+')</span><span class="mval" style="color:var(--rd);">-'+fmtMoney(pExpTotal)+'</span><span class="gforecast-arrow">⌄</span></button><div class="plan-breakdown" id="plan-exp-detail" hidden>'+expDetail+'</div>':'')+
     (recTotal>0?'<button type="button" class="mrow mrow-disclosure" aria-expanded="false" aria-controls="plan-rec-detail" onclick="togglePlanBreakdown(\'plan-rec-detail\',this)"><span class="mlbl">Recurring ('+pRecurring.length+')</span><span class="mval" style="color:var(--rd);">-'+fmtMoney(recTotal)+'</span><span class="gforecast-arrow">⌄</span></button><div class="plan-breakdown" id="plan-rec-detail" hidden>'+recDetail+'</div>':'')+
     ((pExpTotal>0||recTotal>0||pEarned>0)?'<div class="mrow" style="border-top:1px solid var(--bd);margin-top:4px;padding-top:10px;"><span style="font-weight:700;font-size:.87rem;">Net</span><span style="font-weight:800;font-size:1.05rem;color:'+(netAfter>=0?'var(--gn)':'var(--rd)')+';">'+fmtMoney(netAfter)+'</span></div>':'')+
     (taxSet?'<div class="mrow"><span style="font-weight:700;font-size:.87rem;">Est. take-home</span><span style="font-weight:800;font-size:1.05rem;color:var(--gn);">'+fmtMoney(estTakeHome)+'</span></div>':'')+
-    (hasGoals?'<div class="mrow"><span style="font-weight:700;font-size:.87rem;">Save Up</span><span class="mval" style="color:var(--gn);">-'+fmtMoney(saveUpTotal)+'</span></div><div class="mrow"><span style="font-weight:800;font-size:.9rem;">Left</span><span style="font-weight:800;font-size:1.05rem;color:'+(leftAfterSavings>=0?'var(--gn)':'var(--rd)')+';">'+fmtMoney(leftAfterSavings)+'</span></div>':'');
+    (hasGoals?(pContributions.length?'<button type="button" class="mrow mrow-disclosure" aria-expanded="false" aria-controls="plan-saveup-detail" onclick="togglePlanBreakdown(\'plan-saveup-detail\',this)"><span class="mlbl">Save Up ('+pContributions.length+')</span><span class="mval" style="color:var(--gn);">-'+fmtMoney(saveUpTotal)+'</span><span class="gforecast-arrow">⌄</span></button><div class="plan-breakdown" id="plan-saveup-detail" hidden>'+saveUpDetail+'</div>':'')+'<div class="mrow"><span style="font-weight:800;font-size:.9rem;">Left</span><span style="font-weight:800;font-size:1.05rem;color:'+(leftAfterSavings>=0?'var(--gn)':'var(--rd)')+';">'+fmtMoney(leftAfterSavings)+'</span></div>':'');
 }
 
 // ═══ SETTINGS ═══
@@ -1140,13 +1183,62 @@ async function saveGoal(){
       try{opening=await dbIns('goal_contributions',{goal_id:row.id,amount:sv,contribution_date:today,is_opening_balance:true});}
       catch(err){await dbDel('goals',row.id);throw err;}
     }
-    gols.push({id:row.id,name:nm,target:tg,saved:sv,startedOn:row.started_on||today,historyStartedOn:row.history_started_on||today});
+    gols.push({id:row.id,name:nm,target:tg,saved:sv,startedOn:row.started_on||today,historyStartedOn:row.history_started_on||today,createdAt:row.created_at||null});
     if(opening)goalContributions.push({id:opening.id,goalId:row.id,amount:sv,date:today,openingBalance:true,createdAt:opening.created_at});
     cl('sh-goal');toast('Goal added ✓');renderPlan();
   }
   catch(e){toast('Error: '+e.message);}finally{setBusy('sg-save',false,'Add');}
 }
 function openAddSav(id){_gid=id;document.getElementById('sas-am').value='';document.getElementById('sas-date').value=todayStr();document.getElementById('sas-date').max=todayStr();op('sh-addsav');}
+function openEditSav(id){
+  const c=goalContributions.find(x=>x.id===id&&!x.openingBalance);if(!c)return;
+  _contributionId=id;
+  document.getElementById('esu-am').value=Number(c.amount).toFixed(2);
+  document.getElementById('esu-date').value=c.date;
+  document.getElementById('esu-date').max=todayStr();
+  const select=document.getElementById('esu-goal');
+  select.innerHTML='<option value="">No goal</option>'+gols.map(g=>'<option value="'+g.id+'">'+escapeHtml(g.name)+'</option>').join('');
+  select.value=c.goalId||'';
+  op('sh-editsav');
+}
+async function saveEditSav(){
+  if(!goalHistoryReady){toast('Run the goal forecast SQL migrations first');return;}
+  const c=goalContributions.find(x=>x.id===_contributionId&&!x.openingBalance);if(!c)return;
+  const amount=parseFloat(document.getElementById('esu-am').value),date=document.getElementById('esu-date').value,goalId=document.getElementById('esu-goal').value||null;
+  if(!Number.isFinite(amount)||amount<=0){toast('Enter a valid amount');return;}
+  if(!date||date>todayStr()){toast('Choose a valid date (today or earlier)');return;}
+  if(goalId&&!gols.some(g=>g.id===goalId)){toast('Selected goal no longer exists');return;}
+  const old={goalId:c.goalId||null,amount:c.amount,date:c.date};
+  const affected=[...new Set([old.goalId,goalId].filter(Boolean))];
+  setBusy('esu-save',true,'Save');
+  let contributionUpdated=false,updatedGoals=[];
+  try{
+    await dbUpd('goal_contributions',c.id,{goal_id:goalId,amount,contribution_date:date});
+    contributionUpdated=true;
+    const localNext=goalContributions.map(x=>x.id===c.id?{...x,goalId,amount,date}:x);
+    for(const id of affected){
+      const g=gols.find(x=>x.id===id);if(!g)continue;
+      let nextSaved=g.saved;
+      if(old.goalId===id)nextSaved-=old.amount;
+      if(goalId===id)nextSaved+=amount;
+      const ownDates=localNext.filter(x=>x.goalId===id).map(x=>x.date);
+      const createdDate=g.createdAt?(()=>{const d=new Date(g.createdAt);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());})():g.startedOn;
+      const earliest=[createdDate,...ownDates].filter(Boolean).sort()[0]||g.startedOn;
+      const update={saved:Math.max(0,Math.round(nextSaved*100)/100),started_on:earliest,history_started_on:earliest};
+      await dbUpd('goals',id,update);
+      updatedGoals.push({g,previous:{saved:g.saved,startedOn:g.startedOn,historyStartedOn:g.historyStartedOn}});
+      Object.assign(g,{saved:update.saved,startedOn:earliest,historyStartedOn:earliest});
+    }
+    Object.assign(c,{goalId,amount,date});
+    cl('sh-editsav');toast('Save Up updated ✓');renderPlan();
+  }catch(e){
+    for(const item of updatedGoals.reverse()){
+      try{await dbUpd('goals',item.g.id,{saved:item.previous.saved,started_on:item.previous.startedOn,history_started_on:item.previous.historyStartedOn});Object.assign(item.g,item.previous);}catch(rollbackError){}
+    }
+    if(contributionUpdated){try{await dbUpd('goal_contributions',c.id,{goal_id:old.goalId,amount:old.amount,contribution_date:old.date});}catch(rollbackError){}}
+    toast('Error: '+e.message);
+  }finally{setBusy('esu-save',false,'Save');}
+}
 async function doAddSav(){
   if(!goalHistoryReady){toast('Run goal_forecast_migration.sql in Supabase first');return;}
   const am=parseFloat(document.getElementById('sas-am').value),dt=document.getElementById('sas-date').value;
@@ -1165,7 +1257,7 @@ async function doAddSav(){
     cl('sh-addsav');toast('Savings updated ✓');renderPlan();
   }catch(e){toast('Error: '+e.message);}
 }
-async function delGoal(id){try{await dbDel('goals',id);gols=gols.filter(g=>g.id!==id);renderPlan();}catch(e){toast('Error: '+e.message);}}
+async function delGoal(id){try{await dbDel('goals',id);gols=gols.filter(g=>g.id!==id);goalContributions.forEach(c=>{if(c.goalId===id)c.goalId=null;});renderPlan();}catch(e){toast('Error: '+e.message);}}
 
 function openCatSh(){['sc-nm','sc-em'].forEach(x=>document.getElementById(x).value='');op('sh-cat');}
 async function saveCat(){
