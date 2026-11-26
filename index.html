@@ -640,7 +640,7 @@ async function loadAll(){
   const uid=user.id;
   pendingAutoBreakShiftId=null;
   try{
-    const[a,b,c,d,e,f,g,h]=await Promise.all([
+    const[a,b,c,d,e,f,g,h,i]=await Promise.all([
       sb.from('shifts').select('*').eq('user_id',uid),
       sb.from('expenses').select('*').eq('user_id',uid),
       sb.from('recurring').select('*').eq('user_id',uid),
@@ -648,17 +648,18 @@ async function loadAll(){
       sb.from('goals').select('*').eq('user_id',uid),
       sb.from('user_settings').select('*').eq('user_id',uid).maybeSingle(),
       sb.from('week_overrides').select('*').eq('user_id',uid),
-      sb.from('goal_contributions').select('*').eq('user_id',uid)
+      sb.from('goal_contributions').select('*').eq('user_id',uid),
+      sb.from('active_shifts').select('started_at').eq('user_id',uid).maybeSingle()
     ]);
     // Do not replace valid in-memory data with empty arrays after a transient query failure.
-    const coreResults=[a,b,c,d,e,f,g];
+    const coreResults=[a,b,c,d,e,f,g,i];
     const failedCore=coreResults.find(result=>result.error);
     if(failedCore)throw failedCore.error;
     // paid_hours stored on shift; fallback for legacy data: break_taken assumes 30min
     shts=(a.data||[]).map(r=>({
       id:r.id,date:r.date,start:r.start_time,end:r.end_time,hours:+r.hours,note:r.note||'',
       baseRate:+r.base_rate,otRate:+r.ot_rate,otThreshold:+r.ot_threshold,
-      breakTaken:r.break_taken||false,
+      breakTaken:r.break_taken==null?null:!!r.break_taken,
       paidHours:r.paid_hours!=null?+r.paid_hours:(r.break_taken?Math.max(0,+r.hours-0.5):+r.hours)
     }));
     exps=(b.data||[]).map(r=>({id:r.id,name:r.name,amount:+r.amount,catId:r.cat_id,date:r.date,recurringId:r.recurring_id||null,recurringOccurrenceDate:r.recurring_occurrence_date||null}));
@@ -670,18 +671,23 @@ async function loadAll(){
     weekOverrides=(g.data||[]).map(r=>({id:r.id,weekStart:r.week_start,daysCut:r.days_cut}));
     if(f.data){
       const s=f.data;
-      cfg={baseRate:+s.base_rate,otRate:+s.ot_rate,otThreshold:+s.ot_threshold,weekStartDay:s.week_start_day,startingOwed:+s.starting_owed||0,taxRate:+s.tax_rate||0,breakMinutes:+(s.break_minutes||30),weeklySavingsTarget:+s.weekly_savings_target||0,automaticShiftLogging:!!s.automatic_shift_logging,breakAutoThresholdHours:+s.break_auto_threshold_hours||6,activeShiftStartedAt:s.active_shift_started_at||null};
+      cfg={baseRate:+s.base_rate,otRate:+s.ot_rate,otThreshold:+s.ot_threshold,weekStartDay:s.week_start_day,startingOwed:+s.starting_owed||0,taxRate:+s.tax_rate||0,breakMinutes:+(s.break_minutes||30),weeklySavingsTarget:+s.weekly_savings_target||0,automaticShiftLogging:!!s.automatic_shift_logging,breakAutoThresholdHours:+s.break_auto_threshold_hours||6,activeShiftStartedAt:i.data?.started_at||null};
       cats=s.categories||DEF_CATS;
       // If a shift row was saved but clearing the active marker failed, repair it by matching date + start time.
       if(cfg.activeShiftStartedAt){
         const activeAt=new Date(cfg.activeShiftStartedAt);
         if(!Number.isNaN(activeAt.getTime())&&shts.some(x=>x.date===localDateStr(activeAt)&&x.start===localTimeStr(activeAt))){
-          const{error:recoverError}=await sb.from('user_settings').update({active_shift_started_at:null}).eq('user_id',uid);
+          const{error:recoverError}=await sb.from('active_shifts').delete().eq('user_id',uid);
           if(!recoverError)cfg.activeShiftStartedAt=null;
         }
       }
     }else{
-      await sb.from('user_settings').insert({user_id:uid,base_rate:18,ot_rate:27,ot_threshold:40,week_start_day:4,starting_owed:0,tax_rate:0,break_minutes:30,weekly_savings_target:0,automatic_shift_logging:false,break_auto_threshold_hours:6,active_shift_started_at:null,categories:DEF_CATS});
+      await sb.from('user_settings').insert({user_id:uid,base_rate:18,ot_rate:27,ot_threshold:40,week_start_day:4,starting_owed:0,tax_rate:0,break_minutes:30,weekly_savings_target:0,automatic_shift_logging:false,break_auto_threshold_hours:6,categories:DEF_CATS});
+      cfg.activeShiftStartedAt=i.data?.started_at||null;
+    }
+    if(cfg.automaticShiftLogging){
+      const unresolvedToday=shts.find(x=>x.date===todayStr()&&x.breakTaken===null);
+      pendingAutoBreakShiftId=unresolvedToday?.id||null;
     }
     if(!goalHistoryReady)toast('Savings forecasts need the SQL migration: goal_forecast_migration.sql');
     try{
@@ -893,12 +899,12 @@ async function logShift(){
   }catch(err){toast('Error: '+err.message);}finally{btn.textContent='Log shift';btn.disabled=false;}
 }
 async function setActiveShiftStartedAt(value){
-  const{error}=await sb.from('user_settings').update({active_shift_started_at:value}).eq('user_id',user.id);
+  const{error}=await sb.from('active_shifts').upsert({user_id:user.id,started_at:value},{onConflict:'user_id'});
   if(error)throw error;
   cfg.activeShiftStartedAt=value;
 }
 async function clearAutoShiftState(){
-  const{error}=await sb.from('user_settings').update({active_shift_started_at:null}).eq('user_id',user.id);
+  const{error}=await sb.from('active_shifts').delete().eq('user_id',user.id);
   if(error)throw error;
   cfg.activeShiftStartedAt=null;
 }
@@ -940,12 +946,10 @@ async function resolveAutoBreak(breakTaken){
   const yes=document.getElementById('auto-break-yes'),no=document.getElementById('auto-break-no');
   yes.disabled=true;no.disabled=true;
   try{
-    if(breakTaken){
-      // The shift already exists with no break. Update that saved shift only after explicit confirmation.
-      const paidHours=Math.max(0,pending.hours-cfg.breakMinutes/60);
-      await dbUpd('shifts',pending.id,{break_taken:true,paid_hours:paidHours});
-      pending.breakTaken=true;pending.paidHours=paidHours;
-    }
+    // Persist either explicit answer. NULL is reserved for an unanswered prompt.
+    const paidHours=breakTaken?Math.max(0,pending.hours-cfg.breakMinutes/60):pending.hours;
+    await dbUpd('shifts',pending.id,{break_taken:breakTaken,paid_hours:paidHours});
+    pending.breakTaken=breakTaken;pending.paidHours=paidHours;
     pendingAutoBreakShiftId=null;
     toast(breakTaken?'Break recorded':'Shift saved without a break');
     renderToday();
@@ -969,11 +973,12 @@ async function saveAutoShiftEnd(startAt,endAt,breakTaken,askAboutBreak){
   try{
     let existing=shts.find(x=>x.date===ds&&x.start===start);
     if(!existing){
-      const row=await dbIns('shifts',{date:ds,start_time:start,end_time:end,hours,note:'',break_taken:breakTaken,paid_hours:paidHours,base_rate:cfg.baseRate,ot_rate:cfg.otRate,ot_threshold:cfg.otThreshold});
-      existing={id:row.id,date:ds,start,end,hours,note:'',breakTaken,paidHours,baseRate:cfg.baseRate,otRate:cfg.otRate,otThreshold:cfg.otThreshold};
+      const storedBreakTaken=askAboutBreak?null:breakTaken;
+      const row=await dbIns('shifts',{date:ds,start_time:start,end_time:end,hours,note:'',break_taken:storedBreakTaken,paid_hours:paidHours,base_rate:cfg.baseRate,ot_rate:cfg.otRate,ot_threshold:cfg.otThreshold});
+      existing={id:row.id,date:ds,start,end,hours,note:'',breakTaken:storedBreakTaken,paidHours,baseRate:cfg.baseRate,otRate:cfg.otRate,otThreshold:cfg.otThreshold};
       shts.push(existing);
     }
-    // Active start is the only persistent session marker. The question is intentionally in-memory only.
+    // Active start is stored separately; the unanswered break prompt is persisted as NULL in shifts.
     try{await clearAutoShiftState();}
     catch(clearErr){
       // The saved row is authoritative; loadAll() repairs the marker by matching its date + start time.
@@ -1363,7 +1368,7 @@ async function saveCfg(){
   if(cfg.activeShiftStartedAt&&!automaticShiftLogging){toast('Finish the active automatic shift before switching to Manual');document.getElementById('s-auto-logging').checked=true;updateShiftModeControls();return;}
   const nextCfg={...cfg,baseRate:br,otThreshold:thr,otRate:ot,taxRate:tax,weekStartDay:ws,startingOwed:so,breakMinutes:brk,weeklySavingsTarget,automaticShiftLogging,breakAutoThresholdHours:breakAutoThresholdHours||6};
   try{
-    const{error}=await sb.from('user_settings').upsert({user_id:user.id,base_rate:br,ot_rate:ot,ot_threshold:thr,week_start_day:ws,starting_owed:so,tax_rate:tax,break_minutes:brk,weekly_savings_target:weeklySavingsTarget,automatic_shift_logging:automaticShiftLogging,break_auto_threshold_hours:nextCfg.breakAutoThresholdHours,active_shift_started_at:cfg.activeShiftStartedAt,categories:cats},{onConflict:'user_id'});
+    const{error}=await sb.from('user_settings').upsert({user_id:user.id,base_rate:br,ot_rate:ot,ot_threshold:thr,week_start_day:ws,starting_owed:so,tax_rate:tax,break_minutes:brk,weekly_savings_target:weeklySavingsTarget,automatic_shift_logging:automaticShiftLogging,break_auto_threshold_hours:nextCfg.breakAutoThresholdHours,categories:cats},{onConflict:'user_id'});
     if(error)throw error;
     cfg=nextCfg;updateBreakLabels();toast('Settings saved \u2713');renderPlan();renderToday();
   }catch(e){toast('Error: '+e.message);}
